@@ -131,3 +131,11 @@ export async function dbSetDayNote(date: string, note: string) {
     create: { date, note }
   });
 }
+
+export async function dbResetAll() {
+  await prisma.trade.deleteMany();
+  await prisma.account.deleteMany();
+  await prisma.strategy.deleteMany();
+  await prisma.tag.deleteMany();
+  await prisma.dayNote.deleteMany();
+}

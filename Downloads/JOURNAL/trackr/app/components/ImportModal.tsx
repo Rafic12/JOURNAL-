@@ -19,7 +19,7 @@ export default function ImportModal({ open, onClose }: ImportModalProps) {
     broker: string;
     errors: string[];
   } | null>(null);
-  const [accountId, setAccountId] = useState(state.accounts[0]?.id || '');
+  const [accountId, setAccountId] = useState(state.activeAccountId || state.accounts[0]?.id || '');
   const [step, setStep] = useState<'upload' | 'preview' | 'done'>('upload');
   const [parsedTrades, setParsedTrades] = useState<ReturnType<typeof parseCSV> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

@@ -3,6 +3,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AppState, Account, Trade, Strategy, Tag, DayNote } from './types';
 import { generateDemoTrades, DEMO_ACCOUNTS, DEMO_STRATEGIES, DEMO_TAGS } from './demo-data';
+import {
+  dbGetAccounts, dbCreateAccount, dbUpdateAccount, dbDeleteAccount,
+  dbGetTrades, dbCreateTrades, dbUpdateTrade, dbDeleteTrade,
+  dbGetStrategies, dbCreateStrategy, dbUpdateStrategy, dbDeleteStrategy,
+  dbGetTags, dbCreateTag, dbUpdateTag, dbDeleteTag,
+  dbGetDayNotes, dbSetDayNote, dbResetAll
+} from './actions';
 
 const STORAGE_KEY = 'trackr-data';
 
@@ -75,12 +82,69 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const loadedState = loadState();
-    if (!loadedState.theme) loadedState.theme = 'green';
-    if (!loadedState.symbolSettings) loadedState.symbolSettings = {};
-    if (!loadedState.apiKeys) loadedState.apiKeys = {};
-    setState(loadedState);
-    setLoaded(true);
+    async function syncFromDb() {
+      const loadedState = loadState();
+      if (!loadedState.theme) loadedState.theme = 'green';
+      if (!loadedState.symbolSettings) loadedState.symbolSettings = {};
+      if (!loadedState.apiKeys) loadedState.apiKeys = {};
+
+      try {
+        const [dbAccs, dbTrds, dbStrats, dbTgs, dbNotes] = await Promise.all([
+          dbGetAccounts(),
+          dbGetTrades(),
+          dbGetStrategies(),
+          dbGetTags(),
+          dbGetDayNotes(),
+        ]);
+        
+        const mappedAccs = dbAccs.map((a: any) => ({
+          ...a,
+          createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt)
+        })) as Account[];
+        
+        let accounts = mappedAccs;
+        let trades = dbTrds as Trade[];
+        let strategies = dbStrats as Strategy[];
+        let tags = dbTgs as Tag[];
+        let dayNotes = dbNotes as DayNote[];
+
+        if (dbAccs.length === 0 && loadedState.accounts.length > 0) {
+          console.log("Migrating local storage data to Supabase...");
+          await Promise.all([
+            ...loadedState.accounts.map(a => dbCreateAccount(a)),
+            ...loadedState.strategies.map(s => dbCreateStrategy(s)),
+            ...loadedState.tags.map(t => dbCreateTag(t)),
+            ...loadedState.dayNotes.map(n => dbSetDayNote(n.date, n.note)),
+          ]);
+          if (loadedState.trades.length > 0) {
+            await dbCreateTrades(loadedState.trades);
+          }
+          console.log("Migration complete!");
+          accounts = loadedState.accounts;
+          trades = loadedState.trades;
+          strategies = loadedState.strategies;
+          tags = loadedState.tags;
+          dayNotes = loadedState.dayNotes;
+        }
+
+        const mergedState = {
+          ...loadedState,
+          accounts: accounts.length > 0 ? accounts : loadedState.accounts,
+          trades: trades.length > 0 ? trades : loadedState.trades,
+          strategies: strategies.length > 0 ? strategies : loadedState.strategies,
+          tags: tags.length > 0 ? tags : loadedState.tags,
+          dayNotes: dayNotes.length > 0 ? dayNotes : loadedState.dayNotes,
+        };
+
+        setState(mergedState);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
+      } catch (e) {
+        console.log("Supabase not connected, falling back to local storage:", e);
+        setState(loadedState);
+      }
+      setLoaded(true);
+    }
+    syncFromDb();
   }, []);
 
   useEffect(() => {
@@ -97,14 +161,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addAccount = useCallback((account: Omit<Account, 'id' | 'createdAt'>) => {
+    const newAcc = { ...account, id: uid(), createdAt: new Date().toISOString() };
     setState(prev => {
       const newState = {
         ...prev,
-        accounts: [...prev.accounts, { ...account, id: uid(), createdAt: new Date().toISOString() }],
+        accounts: [...prev.accounts, newAcc],
       };
       persist(newState);
       return newState;
     });
+    dbCreateAccount(newAcc).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const updateAccount = useCallback((id: string, updates: Partial<Account>) => {
@@ -116,6 +182,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbUpdateAccount(id, updates).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const deleteAccount = useCallback((id: string) => {
@@ -129,6 +196,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbDeleteAccount(id).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const setActiveAccount = useCallback((id: string | null) => {
@@ -145,6 +213,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbCreateTrades(trades).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const updateTrade = useCallback((id: string, updates: Partial<Trade>) => {
@@ -156,6 +225,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbUpdateTrade(id, updates).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const deleteTrade = useCallback((id: string) => {
@@ -164,17 +234,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbDeleteTrade(id).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const addStrategy = useCallback((strategy: Omit<Strategy, 'id'>) => {
+    const newStrat = { ...strategy, id: uid() };
     setState(prev => {
       const newState = {
         ...prev,
-        strategies: [...prev.strategies, { ...strategy, id: uid() }],
+        strategies: [...prev.strategies, newStrat],
       };
       persist(newState);
       return newState;
     });
+    dbCreateStrategy(newStrat).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const updateStrategy = useCallback((id: string, updates: Partial<Strategy>) => {
@@ -186,6 +259,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbUpdateStrategy(id, updates).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const deleteStrategy = useCallback((id: string) => {
@@ -194,17 +268,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbDeleteStrategy(id).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const addTag = useCallback((tag: Omit<Tag, 'id'>) => {
+    const newTag = { ...tag, id: uid() };
     setState(prev => {
       const newState = {
         ...prev,
-        tags: [...prev.tags, { ...tag, id: uid() }],
+        tags: [...prev.tags, newTag],
       };
       persist(newState);
       return newState;
     });
+    dbCreateTag(newTag).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const updateTag = useCallback((id: string, updates: Partial<Tag>) => {
@@ -216,6 +293,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbUpdateTag(id, updates).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const deleteTag = useCallback((id: string) => {
@@ -224,6 +302,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbDeleteTag(id).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const setDayNote = useCallback((date: string, note: string) => {
@@ -239,6 +318,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       persist(newState);
       return newState;
     });
+    dbSetDayNote(date, note).catch(err => console.error("DB Sync Error:", err));
   }, [persist]);
 
   const getFilteredTrades = useCallback(() => {
@@ -270,6 +350,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
     const freshState = loadState();
     setState(freshState);
+    dbResetAll().catch(err => console.error("Failed to reset database:", err));
   }, []);
 
   if (!loaded) {
