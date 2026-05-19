@@ -7,7 +7,7 @@ import {
   dbGetTrades, dbCreateTrades, dbUpdateTrade, dbDeleteTrade,
   dbGetStrategies, dbCreateStrategy, dbUpdateStrategy, dbDeleteStrategy,
   dbGetTags, dbCreateTag, dbUpdateTag, dbDeleteTag,
-  dbGetDayNotes, dbSetDayNote, dbResetAll
+  dbGetDayNotes, dbSetDayNote, dbResetAll, dbCheckConnection
 } from './actions';
 
 const PREFS_KEY_PREFIX = 'trackr-prefs:'; // local-only UI prefs (theme, active account, settings)
@@ -98,13 +98,32 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
       const prefs = loadPrefs(userId);
 
       try {
-        const [dbAccs, dbTrds, dbStrats, dbTgs, dbNotes] = await Promise.all([
+        const check = await dbCheckConnection();
+        if (!check.success) {
+          throw new Error(check.error);
+        }
+
+        const settled = await Promise.allSettled([
           dbGetAccounts(),
           dbGetTrades(),
           dbGetStrategies(),
           dbGetTags(),
           dbGetDayNotes(),
         ]);
+        const labels = ['accounts', 'trades', 'strategies', 'tags', 'dayNotes'];
+        const failures = settled
+          .map((r, i) => r.status === 'rejected' ? `${labels[i]}: ${(r.reason as any)?.message ?? r.reason}` : null)
+          .filter(Boolean);
+        if (failures.length > 0) {
+          console.error('Supabase load failures:', failures);
+          throw new Error(failures.join(' | '));
+        }
+        const [dbAccsR, dbTrdsR, dbStratsR, dbTgsR, dbNotesR] = settled as PromiseFulfilledResult<any>[];
+        const dbAccs = dbAccsR.value;
+        const dbTrds = dbTrdsR.value;
+        const dbStrats = dbStratsR.value;
+        const dbTgs = dbTgsR.value;
+        const dbNotes = dbNotesR.value;
 
         if (cancelled) return;
 

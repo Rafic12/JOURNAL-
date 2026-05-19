@@ -186,3 +186,55 @@ export async function dbResetAll() {
   await prisma.strategy.deleteMany({ where: { userId } });
   await prisma.tag.deleteMany({ where: { userId } });
 }
+
+// ==========================================
+// DIAGNOSTICS & CONNECTION CHECK
+// ==========================================
+export async function dbCheckConnection() {
+  try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return {
+        success: false,
+        error: "La variable d'environnement NEXT_PUBLIC_SUPABASE_URL n'est pas définie dans votre projet Vercel. Veuillez l'ajouter dans les paramètres Vercel."
+      };
+    }
+    if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return {
+        success: false,
+        error: "La variable d'environnement NEXT_PUBLIC_SUPABASE_ANON_KEY n'est pas définie dans votre projet Vercel. Veuillez l'ajouter dans les paramètres Vercel."
+      };
+    }
+    if (!process.env.DATABASE_URL) {
+      return {
+        success: false,
+        error: "La variable d'environnement DATABASE_URL n'est pas définie dans votre projet Vercel. Veuillez l'ajouter dans les paramètres Vercel."
+      };
+    }
+
+    let userId;
+    try {
+      userId = await requireUserId();
+    } catch (authErr: any) {
+      return {
+        success: false,
+        error: `Authentification Supabase indisponible ou session expirée. Veuillez vous reconnecter. (Détails : ${authErr.message || authErr})`
+      };
+    }
+
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (dbErr: any) {
+      return {
+        success: false,
+        error: `Prisma n'a pas pu se connecter à votre base de données PostgreSQL Supabase. Vérifiez que DATABASE_URL est correcte dans Vercel et que votre base n'est pas en pause. (Détails : ${dbErr.message || dbErr})`
+      };
+    }
+
+    return { success: true, userId };
+  } catch (globalErr: any) {
+    return {
+      success: false,
+      error: `Erreur serveur inattendue lors de la vérification de connexion : ${globalErr.message || globalErr}`
+    };
+  }
+}
