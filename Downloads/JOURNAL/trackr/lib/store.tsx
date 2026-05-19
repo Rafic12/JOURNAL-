@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AppState, Account, Trade, Strategy, Tag, DayNote } from './types';
-import { generateDemoTrades, DEMO_ACCOUNTS, DEMO_STRATEGIES, DEMO_TAGS } from './demo-data';
 import {
   dbGetAccounts, dbCreateAccount, dbUpdateAccount, dbDeleteAccount,
   dbGetTrades, dbCreateTrades, dbUpdateTrade, dbDeleteTrade,
@@ -11,40 +10,43 @@ import {
   dbGetDayNotes, dbSetDayNote, dbResetAll
 } from './actions';
 
-const STORAGE_KEY = 'trackr-data';
+const PREFS_KEY_PREFIX = 'trackr-prefs:'; // local-only UI prefs (theme, active account, settings)
 
 function uid(): string {
   return Math.random().toString(36).substring(2, 11);
 }
 
-function loadState(): AppState {
+interface LocalPrefs {
+  activeAccountId: string | null;
+  theme: string;
+  symbolSettings: Record<string, { multiplier: number }>;
+  apiKeys: Record<string, string>;
+}
+
+function loadPrefs(userId: string): LocalPrefs {
   if (typeof window === 'undefined') {
-    return { accounts: [], trades: [], strategies: [], tags: [], dayNotes: [], activeAccountId: null, theme: 'green', symbolSettings: {}, apiKeys: {} };
+    return { activeAccountId: null, theme: 'green', symbolSettings: {}, apiKeys: {} };
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(PREFS_KEY_PREFIX + userId);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
-
-  // Initialize with demo data
-  const trades = generateDemoTrades();
-  const state: AppState = {
-    accounts: DEMO_ACCOUNTS,
-    trades,
-    strategies: DEMO_STRATEGIES,
-    tags: DEMO_TAGS,
-    dayNotes: [],
-    activeAccountId: 'acc-1',
+  return {
+    activeAccountId: null,
     theme: 'green',
     symbolSettings: { 'US30': { multiplier: 10 }, 'EURUSD': { multiplier: 100000 } },
     apiKeys: {},
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  return state;
+}
+
+function savePrefs(userId: string, prefs: LocalPrefs) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PREFS_KEY_PREFIX + userId, JSON.stringify(prefs));
 }
 
 interface StoreContextType {
   state: AppState;
+  loadError: string | null;
   // Accounts
   addAccount: (account: Omit<Account, 'id' | 'createdAt'>) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
@@ -70,23 +72,30 @@ interface StoreContextType {
   setTheme: (theme: string) => void;
   updateSettings: (updates: { symbolSettings?: Record<string, { multiplier: number }>; apiKeys?: Record<string, string> }) => void;
   // Reset
-  resetData: () => void;
+  resetData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
-export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AppState>({
-    accounts: [], trades: [], strategies: [], tags: [], dayNotes: [], activeAccountId: null, theme: 'green', symbolSettings: {}, apiKeys: {}
+export function StoreProvider({ children, userId }: { children: React.ReactNode; userId: string }) {
+  const [state, setState] = useState<AppState>(() => {
+    const prefs = loadPrefs(userId);
+    return {
+      accounts: [], trades: [], strategies: [], tags: [], dayNotes: [],
+      activeAccountId: prefs.activeAccountId,
+      theme: prefs.theme,
+      symbolSettings: prefs.symbolSettings,
+      apiKeys: prefs.apiKeys,
+    };
   });
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Load data from Supabase whenever userId changes
   useEffect(() => {
+    let cancelled = false;
     async function syncFromDb() {
-      const loadedState = loadState();
-      if (!loadedState.theme) loadedState.theme = 'green';
-      if (!loadedState.symbolSettings) loadedState.symbolSettings = {};
-      if (!loadedState.apiKeys) loadedState.apiKeys = {};
+      const prefs = loadPrefs(userId);
 
       try {
         const [dbAccs, dbTrds, dbStrats, dbTgs, dbNotes] = await Promise.all([
@@ -96,56 +105,53 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           dbGetTags(),
           dbGetDayNotes(),
         ]);
-        
-        const mappedAccs = dbAccs.map((a: any) => ({
+
+        if (cancelled) return;
+
+        const accounts = dbAccs.map((a: any) => ({
           ...a,
-          createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt)
+          createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt),
         })) as Account[];
-        
-        let accounts = mappedAccs;
-        let trades = dbTrds as Trade[];
-        let strategies = dbStrats as Strategy[];
-        let tags = dbTgs as Tag[];
-        let dayNotes = dbNotes as DayNote[];
 
-        if (dbAccs.length === 0 && loadedState.accounts.length > 0) {
-          console.log("Migrating local storage data to Supabase...");
-          await Promise.all([
-            ...loadedState.accounts.map(a => dbCreateAccount(a)),
-            ...loadedState.strategies.map(s => dbCreateStrategy(s)),
-            ...loadedState.tags.map(t => dbCreateTag(t)),
-            ...loadedState.dayNotes.map(n => dbSetDayNote(n.date, n.note)),
-          ]);
-          if (loadedState.trades.length > 0) {
-            await dbCreateTrades(loadedState.trades);
-          }
-          console.log("Migration complete!");
-          accounts = loadedState.accounts;
-          trades = loadedState.trades;
-          strategies = loadedState.strategies;
-          tags = loadedState.tags;
-          dayNotes = loadedState.dayNotes;
-        }
+        const activeAccountId =
+          prefs.activeAccountId && accounts.some(a => a.id === prefs.activeAccountId)
+            ? prefs.activeAccountId
+            : (accounts[0]?.id ?? null);
 
-        const mergedState = {
-          ...loadedState,
-          accounts: accounts.length > 0 ? accounts : loadedState.accounts,
-          trades: trades.length > 0 ? trades : loadedState.trades,
-          strategies: strategies.length > 0 ? strategies : loadedState.strategies,
-          tags: tags.length > 0 ? tags : loadedState.tags,
-          dayNotes: dayNotes.length > 0 ? dayNotes : loadedState.dayNotes,
-        };
-
-        setState(mergedState);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
-      } catch (e) {
-        console.log("Supabase not connected, falling back to local storage:", e);
-        setState(loadedState);
+        setState({
+          accounts,
+          trades: dbTrds as Trade[],
+          strategies: dbStrats as Strategy[],
+          tags: dbTgs as Tag[],
+          dayNotes: dbNotes as DayNote[],
+          activeAccountId,
+          theme: prefs.theme,
+          symbolSettings: prefs.symbolSettings,
+          apiKeys: prefs.apiKeys,
+        });
+        setLoadError(null);
+      } catch (e: any) {
+        if (cancelled) return;
+        console.error('Erreur de synchronisation Supabase :', e);
+        setLoadError(e?.message ?? 'Erreur Supabase');
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
-      setLoaded(true);
     }
     syncFromDb();
-  }, []);
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  // Persist UI prefs (theme, settings, active account) per user
+  useEffect(() => {
+    if (!loaded) return;
+    savePrefs(userId, {
+      activeAccountId: state.activeAccountId,
+      theme: state.theme,
+      symbolSettings: state.symbolSettings,
+      apiKeys: state.apiKeys,
+    });
+  }, [loaded, userId, state.activeAccountId, state.theme, state.symbolSettings, state.apiKeys]);
 
   useEffect(() => {
     if (state.theme && state.theme !== 'green') {
@@ -155,171 +161,88 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.theme]);
 
-  const persist = useCallback((newState: AppState) => {
-    setState(newState);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
-  }, []);
-
   const addAccount = useCallback((account: Omit<Account, 'id' | 'createdAt'>) => {
     const newAcc = { ...account, id: uid(), createdAt: new Date().toISOString() };
-    setState(prev => {
-      const newState = {
-        ...prev,
-        accounts: [...prev.accounts, newAcc],
-      };
-      persist(newState);
-      return newState;
-    });
-    dbCreateAccount(newAcc).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, accounts: [...prev.accounts, newAcc] }));
+    dbCreateAccount(newAcc).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const updateAccount = useCallback((id: string, updates: Partial<Account>) => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        accounts: prev.accounts.map(a => a.id === id ? { ...a, ...updates } : a),
-      };
-      persist(newState);
-      return newState;
-    });
-    dbUpdateAccount(id, updates).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === id ? { ...a, ...updates } : a) }));
+    dbUpdateAccount(id, updates).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const deleteAccount = useCallback((id: string) => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        accounts: prev.accounts.filter(a => a.id !== id),
-        trades: prev.trades.filter(t => t.accountId !== id),
-        activeAccountId: prev.activeAccountId === id ? null : prev.activeAccountId,
-      };
-      persist(newState);
-      return newState;
-    });
-    dbDeleteAccount(id).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({
+      ...prev,
+      accounts: prev.accounts.filter(a => a.id !== id),
+      trades: prev.trades.filter(t => t.accountId !== id),
+      activeAccountId: prev.activeAccountId === id ? null : prev.activeAccountId,
+    }));
+    dbDeleteAccount(id).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const setActiveAccount = useCallback((id: string | null) => {
-    setState(prev => {
-      const newState = { ...prev, activeAccountId: id };
-      persist(newState);
-      return newState;
-    });
-  }, [persist]);
+    setState(prev => ({ ...prev, activeAccountId: id }));
+  }, []);
 
   const addTrades = useCallback((trades: Trade[]) => {
-    setState(prev => {
-      const newState = { ...prev, trades: [...prev.trades, ...trades] };
-      persist(newState);
-      return newState;
-    });
-    dbCreateTrades(trades).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, trades: [...prev.trades, ...trades] }));
+    dbCreateTrades(trades).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const updateTrade = useCallback((id: string, updates: Partial<Trade>) => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        trades: prev.trades.map(t => t.id === id ? { ...t, ...updates } : t),
-      };
-      persist(newState);
-      return newState;
-    });
-    dbUpdateTrade(id, updates).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, trades: prev.trades.map(t => t.id === id ? { ...t, ...updates } : t) }));
+    dbUpdateTrade(id, updates).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const deleteTrade = useCallback((id: string) => {
-    setState(prev => {
-      const newState = { ...prev, trades: prev.trades.filter(t => t.id !== id) };
-      persist(newState);
-      return newState;
-    });
-    dbDeleteTrade(id).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, trades: prev.trades.filter(t => t.id !== id) }));
+    dbDeleteTrade(id).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const addStrategy = useCallback((strategy: Omit<Strategy, 'id'>) => {
     const newStrat = { ...strategy, id: uid() };
-    setState(prev => {
-      const newState = {
-        ...prev,
-        strategies: [...prev.strategies, newStrat],
-      };
-      persist(newState);
-      return newState;
-    });
-    dbCreateStrategy(newStrat).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, strategies: [...prev.strategies, newStrat] }));
+    dbCreateStrategy(newStrat).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const updateStrategy = useCallback((id: string, updates: Partial<Strategy>) => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        strategies: prev.strategies.map(s => s.id === id ? { ...s, ...updates } : s),
-      };
-      persist(newState);
-      return newState;
-    });
-    dbUpdateStrategy(id, updates).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, strategies: prev.strategies.map(s => s.id === id ? { ...s, ...updates } : s) }));
+    dbUpdateStrategy(id, updates).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const deleteStrategy = useCallback((id: string) => {
-    setState(prev => {
-      const newState = { ...prev, strategies: prev.strategies.filter(s => s.id !== id) };
-      persist(newState);
-      return newState;
-    });
-    dbDeleteStrategy(id).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, strategies: prev.strategies.filter(s => s.id !== id) }));
+    dbDeleteStrategy(id).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const addTag = useCallback((tag: Omit<Tag, 'id'>) => {
     const newTag = { ...tag, id: uid() };
-    setState(prev => {
-      const newState = {
-        ...prev,
-        tags: [...prev.tags, newTag],
-      };
-      persist(newState);
-      return newState;
-    });
-    dbCreateTag(newTag).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, tags: [...prev.tags, newTag] }));
+    dbCreateTag(newTag).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const updateTag = useCallback((id: string, updates: Partial<Tag>) => {
-    setState(prev => {
-      const newState = {
-        ...prev,
-        tags: prev.tags.map(t => t.id === id ? { ...t, ...updates } : t),
-      };
-      persist(newState);
-      return newState;
-    });
-    dbUpdateTag(id, updates).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, tags: prev.tags.map(t => t.id === id ? { ...t, ...updates } : t) }));
+    dbUpdateTag(id, updates).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const deleteTag = useCallback((id: string) => {
-    setState(prev => {
-      const newState = { ...prev, tags: prev.tags.filter(t => t.id !== id) };
-      persist(newState);
-      return newState;
-    });
-    dbDeleteTag(id).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    setState(prev => ({ ...prev, tags: prev.tags.filter(t => t.id !== id) }));
+    dbDeleteTag(id).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const setDayNote = useCallback((date: string, note: string) => {
     setState(prev => {
-      const existing = prev.dayNotes.findIndex(n => n.date === date);
+      const idx = prev.dayNotes.findIndex(n => n.date === date);
       const dayNotes = [...prev.dayNotes];
-      if (existing >= 0) {
-        dayNotes[existing] = { date, note };
-      } else {
-        dayNotes.push({ date, note });
-      }
-      const newState = { ...prev, dayNotes };
-      persist(newState);
-      return newState;
+      if (idx >= 0) dayNotes[idx] = { date, note };
+      else dayNotes.push({ date, note });
+      return { ...prev, dayNotes };
     });
-    dbSetDayNote(date, note).catch(err => console.error("DB Sync Error:", err));
-  }, [persist]);
+    dbSetDayNote(date, note).catch(err => console.error('DB Sync Error:', err));
+  }, []);
 
   const getFilteredTrades = useCallback(() => {
     if (!state.activeAccountId) return state.trades;
@@ -327,31 +250,35 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [state.activeAccountId, state.trades]);
 
   const setTheme = useCallback((theme: string) => {
-    setState(prev => {
-      const newState = { ...prev, theme };
-      persist(newState);
-      return newState;
-    });
-  }, [persist]);
+    setState(prev => ({ ...prev, theme }));
+  }, []);
 
   const updateSettings = useCallback((updates: { symbolSettings?: Record<string, { multiplier: number }>; apiKeys?: Record<string, string> }) => {
-    setState(prev => {
-      const newState = { 
-        ...prev, 
-        symbolSettings: updates.symbolSettings ? { ...prev.symbolSettings, ...updates.symbolSettings } : prev.symbolSettings,
-        apiKeys: updates.apiKeys ? { ...prev.apiKeys, ...updates.apiKeys } : prev.apiKeys
-      };
-      persist(newState);
-      return newState;
-    });
-  }, [persist]);
-
-  const resetData = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    const freshState = loadState();
-    setState(freshState);
-    dbResetAll().catch(err => console.error("Failed to reset database:", err));
+    setState(prev => ({
+      ...prev,
+      symbolSettings: updates.symbolSettings ? { ...prev.symbolSettings, ...updates.symbolSettings } : prev.symbolSettings,
+      apiKeys: updates.apiKeys ? { ...prev.apiKeys, ...updates.apiKeys } : prev.apiKeys,
+    }));
   }, []);
+
+  const resetData = useCallback(async () => {
+    try {
+      await dbResetAll();
+    } catch (err) {
+      console.error('Failed to reset database:', err);
+      throw err;
+    }
+    // Clear local prefs (keep theme so the user keeps their UI theme)
+    const keptTheme = state.theme;
+    localStorage.removeItem(PREFS_KEY_PREFIX + userId);
+    setState({
+      accounts: [], trades: [], strategies: [], tags: [], dayNotes: [],
+      activeAccountId: null,
+      theme: keptTheme,
+      symbolSettings: { 'US30': { multiplier: 10 }, 'EURUSD': { multiplier: 100000 } },
+      apiKeys: {},
+    });
+  }, [userId, state.theme]);
 
   if (!loaded) {
     return (
@@ -366,7 +293,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             borderTop: '3px solid #3b82f6', borderRadius: '50%',
             animation: 'spin 1s linear infinite', margin: '0 auto 16px'
           }} />
-          <p style={{ color: '#a1a1aa' }}>Chargement...</p>
+          <p style={{ color: '#a1a1aa' }}>Chargement de vos données...</p>
         </div>
       </div>
     );
@@ -374,13 +301,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <StoreContext.Provider value={{
-      state,
+      state, loadError,
       addAccount, updateAccount, deleteAccount, setActiveAccount,
       addTrades, updateTrade, deleteTrade,
       addStrategy, updateStrategy, deleteStrategy,
       addTag, updateTag, deleteTag,
       setDayNote, getFilteredTrades, setTheme, updateSettings, resetData,
     }}>
+      {loadError && (
+        <div style={{
+          position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
+          background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)',
+          color: '#fecaca', padding: '10px 16px', borderRadius: 10, fontSize: 13,
+          backdropFilter: 'blur(8px)', maxWidth: 600,
+        }}>
+          Connexion Supabase indisponible : {loadError}
+        </div>
+      )}
       {children}
     </StoreContext.Provider>
   );

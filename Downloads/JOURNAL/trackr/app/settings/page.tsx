@@ -20,10 +20,13 @@ export default function SettingsPage() {
     document.body.removeChild(link);
   };
 
-  const handleReset = () => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer toutes vos données ? Cette action est irréversible.')) {
-      resetData();
+  const handleReset = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer toutes vos données ? Cette action est irréversible.')) return;
+    try {
+      await resetData();
       router.push('/');
+    } catch (e: any) {
+      alert('Erreur lors de la réinitialisation : ' + (e?.message ?? e));
     }
   };
 

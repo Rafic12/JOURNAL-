@@ -9,6 +9,7 @@ datasource db {
 
 model Account {
   id             String   @id @default(uuid())
+  userId         String
   name           String
   type           String   // 'live', 'demo', 'prop_phase1', 'prop_phase2', 'prop_funded'
   broker         String
@@ -17,26 +18,35 @@ model Account {
   createdAt      DateTime @default(now())
 
   trades         Trade[]
+
+  @@index([userId])
 }
 
 model Strategy {
   id          String   @id @default(uuid())
+  userId      String
   name        String
   description String
 
   trades      Trade[]
+
+  @@index([userId])
 }
 
 model Tag {
-  id    String @id @default(uuid())
-  name  String
-  color String
+  id     String @id @default(uuid())
+  userId String
+  name   String
+  color  String
 
   trades Trade[]
+
+  @@index([userId])
 }
 
 model Trade {
   id          String    @id @default(uuid())
+  userId      String
   ticketId    String
   symbol      String
   direction   String    // 'long' | 'short'
@@ -62,9 +72,16 @@ model Trade {
   strategy    Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
 
   tags        Tag[]
+
+  @@index([userId])
+  @@index([accountId])
 }
 
 model DayNote {
-  date String @id // YYYY-MM-DD
-  note String
+  userId String
+  date   String // YYYY-MM-DD
+  note   String
+
+  @@id([userId, date])
+  @@index([userId])
 }
