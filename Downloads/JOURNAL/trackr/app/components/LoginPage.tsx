@@ -81,7 +81,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         <div className="login-branding">
           <div className="login-brand-content">
             <div className="login-logo-row" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img src="/logo.png" alt="Tarchives Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+              <img src="/favicon.ico" alt="Journal+ Logo" style={{ width: 40, height: 40, objectFit: 'contain' }} />
               <span style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.05em', color: 'var(--text-primary)' }}>
                 Journal<span style={{ color: 'var(--accent)' }}>+</span>
               </span>

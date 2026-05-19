@@ -5,6 +5,9 @@ import AppShell from "./AppShell";
 export const metadata: Metadata = {
   title: "Journal+ — Journal de Trading",
   description: "Analysez et optimisez vos performances de trading avec Journal+. Importez vos trades, suivez vos KPIs et identifiez votre edge.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -15,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
