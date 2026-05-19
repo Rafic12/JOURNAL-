@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id             String   @id @default(uuid())
+  name           String
+  type           String   // 'live', 'demo', 'prop_phase1', 'prop_phase2', 'prop_funded'
+  broker         String
+  balanceInitial Float
+  currency       String
+  createdAt      DateTime @default(now())
+
+  trades         Trade[]
+}
+
+model Strategy {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+
+  trades      Trade[]
+}
+
+model Tag {
+  id    String @id @default(uuid())
+  name  String
+  color String
+
+  trades Trade[]
+}
+
+model Trade {
+  id          String    @id @default(uuid())
+  ticketId    String
+  symbol      String
+  direction   String    // 'long' | 'short'
+  status      String    // 'open' | 'closed'
+  openTime    DateTime
+  closeTime   DateTime?
+  openPrice   Float
+  closePrice  Float?
+  volume      Float
+  multiplier  Float
+  profitGross Float
+  commission  Float
+  swap        Float
+  profitNet   Float
+  notes       String?
+  imageUrl    String?
+  rMultiple   Float?
+
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  strategyId  String?
+  strategy    Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+
+  tags        Tag[]
+}
+
+model DayNote {
+  date String @id // YYYY-MM-DD
+  note String
+}
