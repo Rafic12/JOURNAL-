@@ -83,20 +83,22 @@ export default function Sidebar({ onImport, onStrategies, onTags, user, onLogout
           </span>
         </div>
 
-        <div style={{ padding: '0 16px 16px' }}>
-          <button 
-            className="btn btn-outline" 
-            style={{ width: '100%', borderColor: 'var(--border)', color: 'var(--accent)', padding: '12px', height: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}
-            onClick={() => { router.push('/comptes'); setMobileOpen(false); }}
-          >
-            <div className="flex items-center gap-2" style={{ fontWeight: 600, fontSize: '14px' }}>
-              <Plus size={16} /> Créer ton premier compte
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400, paddingLeft: '24px' }}>
-              Live, prop firm, demo, backtest...
-            </div>
-          </button>
-        </div>
+        {state.accounts.length === 0 && (
+          <div style={{ padding: '0 16px 16px' }}>
+            <button 
+              className="btn btn-outline" 
+              style={{ width: '100%', borderColor: 'var(--border)', color: 'var(--accent)', padding: '12px', height: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}
+              onClick={() => { router.push('/comptes'); setMobileOpen(false); }}
+            >
+              <div className="flex items-center gap-2" style={{ fontWeight: 600, fontSize: '14px' }}>
+                <Plus size={16} /> Créer ton premier compte
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400, paddingLeft: '24px' }}>
+                Live, prop firm, demo, backtest...
+              </div>
+            </button>
+          </div>
+        )}
 
         <nav className="sidebar-nav" style={{ flex: 1, overflowY: 'auto' }}>
           

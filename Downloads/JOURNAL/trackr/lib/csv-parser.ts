@@ -197,6 +197,8 @@ export function parseCSV(content: string, accountId: string): { trades: Trade[];
         notes: '',
         imageUrl: null,
         rMultiple: null,
+        sl: null,
+        tp: null,
       });
     } catch (err) {
       errors.push(`Ligne ${i + 1}: Erreur de parsing — ${(err as Error).message}`);

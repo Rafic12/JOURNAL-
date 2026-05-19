@@ -64,6 +64,8 @@ model Trade {
   notes       String?
   imageUrl    String?
   rMultiple   Float?
+  sl          Float?
+  tp          Float?
 
   accountId   String
   account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)

@@ -34,7 +34,7 @@ export interface Trade {
   ticketId: string;
   symbol: string;
   direction: TradeDirection;
-  status: 'open' | 'closed';
+  status: 'open' | 'closed' | 'pending';
   openTime: string;
   closeTime: string | null;
   openPrice: number;
@@ -50,6 +50,8 @@ export interface Trade {
   notes: string;
   imageUrl: string | null;
   rMultiple: number | null;
+  sl: number | null;
+  tp: number | null;
 }
 
 export interface DayNote {
@@ -66,7 +68,7 @@ export interface AppState {
   activeAccountId: string | null;
   theme: string;
   symbolSettings: Record<string, { multiplier: number }>;
-  apiKeys: { twelvedata?: string; finnhub?: string; polygon?: string };
+  apiKeys: { twelvedata?: string; twelveData?: string; finnhub?: string; polygon?: string };
 }
 
 // KPI Metrics computed from trades

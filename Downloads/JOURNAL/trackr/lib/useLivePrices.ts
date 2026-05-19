@@ -11,7 +11,29 @@ function isCrypto(symbol: string): boolean {
   return !!BINANCE_MAPPING[symbol] || symbol.endsWith('USDT');
 }
 
-export function useLivePrices(symbols: string[], apiKeys?: { finnhub?: string }) {
+function toTwelveDataSymbol(symbol: string): string {
+  if (symbol === 'EURUSD') return 'EUR/USD';
+  if (symbol === 'GBPUSD') return 'GBP/USD';
+  if (symbol === 'USDJPY') return 'USD/JPY';
+  if (symbol === 'AUDUSD') return 'AUD/USD';
+  if (symbol === 'USDCAD') return 'USD/CAD';
+  if (symbol === 'USDCHF') return 'USD/CHF';
+  if (symbol === 'XAUUSD') return 'XAU/USD';
+  if (symbol === 'US30') return 'DJI';
+  if (symbol === 'NAS100') return 'IXIC';
+  if (symbol === 'SPX500') return 'SPX';
+  return symbol;
+}
+
+function fromTwelveDataSymbol(tdSymbol: string): string {
+  const s = tdSymbol.toUpperCase().replace('/', '');
+  if (s === 'DJI') return 'US30';
+  if (s === 'IXIC') return 'NAS100';
+  if (s === 'SPX') return 'SPX500';
+  return s;
+}
+
+export function useLivePrices(symbols: string[], apiKeys?: { finnhub?: string; twelveData?: string }) {
   const [prices, setPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -23,7 +45,9 @@ export function useLivePrices(symbols: string[], apiKeys?: { finnhub?: string })
     let isActive = true;
     let cryptoWs: WebSocket | null = null;
     let finnhubWs: WebSocket | null = null;
+    let twelveDataWs: WebSocket | null = null;
     let simInterval: NodeJS.Timeout | null = null;
+    let twelvePollingInterval: NodeJS.Timeout | null = null;
 
     // 1. Setup Binance WebSocket for Crypto
     if (cryptoSymbols.length > 0) {
@@ -46,15 +70,66 @@ export function useLivePrices(symbols: string[], apiKeys?: { finnhub?: string })
       };
     }
 
-    // 2. Setup Finnhub WebSocket or Simulated Feed for Forex/Indices
+    // 2. Setup Forex/Indices (Twelve Data -> Finnhub -> Simulated)
     if (fiatSymbols.length > 0) {
-      if (apiKeys?.finnhub) {
-        // Use real Finnhub websocket
+      if (apiKeys?.twelveData) {
+        // Twelve Data WebSocket setup
+        try {
+          twelveDataWs = new WebSocket(`wss://ws.twelvedata.com/v1/quotes/price?apikey=${apiKeys.twelveData}`);
+          twelveDataWs.onopen = () => {
+            const mapped = fiatSymbols.map(toTwelveDataSymbol);
+            twelveDataWs?.send(JSON.stringify({
+              action: 'subscribe',
+              params: { symbols: mapped.join(',') }
+            }));
+          };
+          twelveDataWs.onmessage = (event) => {
+            if (!isActive) return;
+            try {
+              const data = JSON.parse(event.data);
+              if (data.event === 'price' && data.price && data.symbol) {
+                const original = fromTwelveDataSymbol(data.symbol);
+                setPrices(prev => ({ ...prev, [original]: parseFloat(data.price) }));
+              }
+            } catch (e) {}
+          };
+        } catch (err) {
+          console.error('Twelve Data WebSocket Error:', err);
+        }
+
+        // Twelve Data Robust REST Polling Fallback (Every 8 seconds)
+        const fetchTwelvePrices = async () => {
+          if (!isActive) return;
+          try {
+            const mappedSymbols = fiatSymbols.map(toTwelveDataSymbol).join(',');
+            const res = await fetch(`https://api.twelvedata.com/price?symbol=${mappedSymbols}&apikey=${apiKeys.twelveData}`);
+            const data = await res.json();
+            if (!data || data.status === 'error') return;
+
+            setPrices(prev => {
+              const next = { ...prev };
+              fiatSymbols.forEach(sym => {
+                const mappedSym = toTwelveDataSymbol(sym);
+                const item = data[mappedSym];
+                if (item && item.price) {
+                  next[sym] = parseFloat(item.price);
+                } else if (data.price && fiatSymbols.length === 1) {
+                  next[sym] = parseFloat(data.price);
+                }
+              });
+              return next;
+            });
+          } catch (e) {}
+        };
+
+        fetchTwelvePrices();
+        twelvePollingInterval = setInterval(fetchTwelvePrices, 8000);
+
+      } else if (apiKeys?.finnhub) {
+        // Use Finnhub WebSocket
         finnhubWs = new WebSocket(`wss://ws.finnhub.io?token=${apiKeys.finnhub}`);
         finnhubWs.onopen = () => {
           fiatSymbols.forEach(sym => {
-            // Finnhub symbols for forex usually look like OANDA:EUR_USD or BINANCE:BTCUSDT
-            // We do a simple mapping here for common ones, or fallback to exact string.
             let finnhubSym = sym;
             if (sym === 'EURUSD') finnhubSym = 'OANDA:EUR_USD';
             if (sym === 'GBPUSD') finnhubSym = 'OANDA:GBP_USD';
@@ -109,9 +184,11 @@ export function useLivePrices(symbols: string[], apiKeys?: { finnhub?: string })
       isActive = false;
       if (cryptoWs) cryptoWs.close();
       if (finnhubWs) finnhubWs.close();
+      if (twelveDataWs) twelveDataWs.close();
       if (simInterval) clearInterval(simInterval);
+      if (twelvePollingInterval) clearInterval(twelvePollingInterval);
     };
-  }, [symbols.join(','), apiKeys?.finnhub]);
+  }, [symbols.join(','), apiKeys?.finnhub, apiKeys?.twelveData]);
 
   return prices;
 }

@@ -139,6 +139,8 @@ export function generateDemoTrades(): Trade[] {
         notes: '',
         imageUrl: null,
         rMultiple,
+        sl: null,
+        tp: null,
       });
     }
 

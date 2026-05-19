@@ -21,12 +21,13 @@ function formatTime(iso: string): string {
   });
 }
 
-type SortKey = 'closeTime' | 'symbol' | 'direction' | 'profitNet' | 'volume';
+type SortKey = 'closeTime' | 'symbol' | 'direction' | 'profitNet' | 'volume' | 'rMultiple';
 
 export default function JournalPage() {
   const { getFilteredTrades, state, deleteTrade, updateTrade, addTrades } = useStore();
   const trades = getFilteredTrades();
 
+  const [activeTab, setActiveTab] = useState<'open' | 'closed' | 'pending'>('closed');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('closeTime');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -45,7 +46,7 @@ export default function JournalPage() {
   const [newTrade, setNewTrade] = useState({
     symbol: 'EURUSD',
     direction: 'long' as 'long' | 'short',
-    status: 'closed' as 'open' | 'closed',
+    status: 'closed' as 'open' | 'closed' | 'pending',
     openTime: new Date().toISOString().slice(0, 16),
     closeTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
     openPrice: 0,
@@ -53,12 +54,45 @@ export default function JournalPage() {
     volume: 1,
     multiplier: 100000,
     profitNet: 0,
+    rMultiple: 0,
+    strategyId: '' as string | null,
+    tagIds: [] as string[],
+    sl: 0,
+    tp: 0,
   });
+
+  // Edit Trade Modal State
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+  const [editingTradeData, setEditingTradeData] = useState<any>(null);
+
+  const startEditing = (trade: Trade) => {
+    setEditingTrade(trade);
+    setEditingTradeData({
+      symbol: trade.symbol,
+      direction: trade.direction,
+      status: trade.status,
+      openTime: new Date(trade.openTime).toISOString().slice(0, 16),
+      closeTime: trade.closeTime ? new Date(trade.closeTime).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+      openPrice: trade.openPrice,
+      closePrice: trade.closePrice || 0,
+      volume: trade.volume,
+      multiplier: trade.multiplier,
+      profitNet: trade.profitNet,
+      rMultiple: trade.rMultiple || 0,
+      strategyId: trade.strategyId || '',
+      tagIds: trade.tagIds || [],
+      sl: trade.sl || 0,
+      tp: trade.tp || 0,
+    });
+  };
 
   const symbols = useMemo(() => [...new Set(trades.map(t => t.symbol))].sort(), [trades]);
 
   const filtered = useMemo(() => {
     let result = [...trades];
+
+    // Filter by active tab (open / closed / pending)
+    result = result.filter(t => t.status === activeTab);
 
     if (search) {
       const s = search.toLowerCase();
@@ -82,12 +116,13 @@ export default function JournalPage() {
       }
       else if (sortKey === 'profitNet') cmp = a.profitNet - b.profitNet;
       else if (sortKey === 'volume') cmp = a.volume - b.volume;
+      else if (sortKey === 'rMultiple') cmp = (a.rMultiple || 0) - (b.rMultiple || 0);
       else cmp = (a[sortKey] as string).localeCompare(b[sortKey] as string);
       return sortDir === 'desc' ? -cmp : cmp;
     });
 
     return result;
-  }, [trades, search, sortKey, sortDir, filterStrategy, filterSymbol, filterDirection]);
+  }, [trades, activeTab, search, sortKey, sortDir, filterStrategy, filterSymbol, filterDirection]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -151,6 +186,10 @@ export default function JournalPage() {
     updateTrade(tradeId, { imageUrl: null });
   };
 
+  const openCount = trades.filter(t => t.status === 'open').length;
+  const closedCount = trades.filter(t => t.status === 'closed').length;
+  const pendingCount = trades.filter(t => t.status === 'pending').length;
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -159,7 +198,7 @@ export default function JournalPage() {
             <h1 className="page-title">Journal</h1>
             <p className="page-subtitle">
               {filtered.length} trades
-              {filtered.length !== trades.length && ` (${trades.length} total)`}
+              {filtered.length !== trades.length && ` (${trades.length} au total)`}
             </p>
           </div>
           <button 
@@ -168,7 +207,7 @@ export default function JournalPage() {
               setNewTrade({
                 symbol: 'EURUSD',
                 direction: 'long',
-                status: 'closed',
+                status: activeTab,
                 openTime: new Date().toISOString().slice(0, 16),
                 closeTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
                 openPrice: 0,
@@ -176,6 +215,11 @@ export default function JournalPage() {
                 volume: 1,
                 multiplier: 100000,
                 profitNet: 0,
+                rMultiple: 0,
+                strategyId: '',
+                tagIds: [],
+                sl: 0,
+                tp: 0,
               });
               setShowAddTrade(true);
             }}
@@ -183,6 +227,61 @@ export default function JournalPage() {
             <Plus size={16} /> Nouveau Trade
           </button>
         </div>
+      </div>
+
+      {/* Modern Status Tabs */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        borderBottom: '1px solid var(--border)',
+        paddingBottom: '12px',
+        marginBottom: '20px'
+      }}>
+        <button
+          className={`btn ${activeTab === 'open' ? 'btn-accent' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('open')}
+          style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          En cours
+          <span style={{
+            fontSize: '10px',
+            background: activeTab === 'open' ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+            color: activeTab === 'open' ? '#fff' : 'var(--text-secondary)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontWeight: 700
+          }}>{openCount}</span>
+        </button>
+        <button
+          className={`btn ${activeTab === 'closed' ? 'btn-accent' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('closed')}
+          style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          Terminés
+          <span style={{
+            fontSize: '10px',
+            background: activeTab === 'closed' ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+            color: activeTab === 'closed' ? '#fff' : 'var(--text-secondary)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontWeight: 700
+          }}>{closedCount}</span>
+        </button>
+        <button
+          className={`btn ${activeTab === 'pending' ? 'btn-accent' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('pending')}
+          style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          En attente
+          <span style={{
+            fontSize: '10px',
+            background: activeTab === 'pending' ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+            color: activeTab === 'pending' ? '#fff' : 'var(--text-secondary)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontWeight: 700
+          }}>{pendingCount}</span>
+        </button>
       </div>
 
       {/* Hidden file input for screenshots */}
@@ -294,6 +393,11 @@ export default function JournalPage() {
                 </th>
                 <th>Prix Entrée</th>
                 <th>Prix Sortie</th>
+                <th>SL</th>
+                <th>TP</th>
+                <th onClick={() => handleSort('rMultiple')}>
+                  <span className="flex items-center gap-2">R:R <SortIcon field="rMultiple" /></span>
+                </th>
                 <th onClick={() => handleSort('profitNet')}>
                   <span className="flex items-center gap-2">P&L <SortIcon field="profitNet" /></span>
                 </th>
@@ -306,11 +410,28 @@ export default function JournalPage() {
             </thead>
             <tbody>
               {filtered.slice(0, 100).map(trade => (
-                <tr key={trade.id}>
+                <tr 
+                  key={trade.id}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button') || target.closest('input') || target.closest('img') || target.closest('select')) {
+                      return;
+                    }
+                    startEditing(trade);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <td>
                     {trade.status === 'open' ? (
                       <div>
                         <span className="badge badge-neutral" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>EN COURS</span><br/>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {formatTime(trade.openTime)}
+                        </span>
+                      </div>
+                    ) : trade.status === 'pending' ? (
+                      <div>
+                        <span className="badge badge-neutral" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent)' }}>EN ATTENTE</span><br/>
                         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           {formatTime(trade.openTime)}
                         </span>
@@ -336,8 +457,19 @@ export default function JournalPage() {
                   <td className="mono">{trade.volume}</td>
                   <td className="mono">{trade.openPrice}</td>
                   <td className="mono">{trade.closePrice !== null ? trade.closePrice : '-'}</td>
+                  <td className="mono">{trade.sl !== null && trade.sl !== undefined ? trade.sl : '—'}</td>
+                  <td className="mono">{trade.tp !== null && trade.tp !== undefined ? trade.tp : '—'}</td>
                   <td>
-                    {trade.status === 'open' ? (
+                    {trade.rMultiple !== null && trade.rMultiple !== undefined ? (
+                      <span className={`badge ${trade.rMultiple >= 0 ? 'badge-win' : 'badge-loss'}`} style={{ fontWeight: 700 }}>
+                        {trade.rMultiple >= 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
+                      </span>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {trade.status === 'open' || trade.status === 'pending' ? (
                       <span className="mono text-muted" style={{ fontWeight: 700 }}>
                         -
                       </span>
@@ -489,6 +621,10 @@ export default function JournalPage() {
                     <input type="radio" name="status" checked={newTrade.status === 'open'} onChange={() => setNewTrade({ ...newTrade, status: 'open' })} />
                     En cours
                   </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                    <input type="radio" name="status" checked={newTrade.status === 'pending'} onChange={() => setNewTrade({ ...newTrade, status: 'pending' })} />
+                    En attente
+                  </label>
                 </div>
               </div>
 
@@ -541,12 +677,98 @@ export default function JournalPage() {
                 <label className="label">Volume (Lots)</label>
                 <input type="number" step="0.01" className="input" value={newTrade.volume} onChange={e => setNewTrade({ ...newTrade, volume: parseFloat(e.target.value) || 0 })} />
               </div>
-              {newTrade.status === 'closed' && (
+              {newTrade.status === 'closed' ? (
                 <div className="form-group">
                   <label className="label">Profit Net ($)</label>
                   <input type="number" step="any" className="input" value={newTrade.profitNet} onChange={e => setNewTrade({ ...newTrade, profitNet: parseFloat(e.target.value) || 0 })} />
                 </div>
+              ) : (
+                <div className="form-group" style={{ height: 0 }}></div>
               )}
+
+              <div className="form-group">
+                <label className="label">Stratégie</label>
+                <select 
+                  className="select" 
+                  value={newTrade.strategyId || ''} 
+                  onChange={e => setNewTrade({ ...newTrade, strategyId: e.target.value || null })}
+                >
+                  <option value="">Aucune stratégie</option>
+                  {state.strategies.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="label">R:R (Multiple R)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input" 
+                  value={newTrade.rMultiple} 
+                  onChange={e => setNewTrade({ ...newTrade, rMultiple: parseFloat(e.target.value) || 0 })} 
+                  placeholder="Ex: 2.5"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="label">Stop Loss (SL)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  className="input" 
+                  value={newTrade.sl || ''} 
+                  onChange={e => setNewTrade({ ...newTrade, sl: parseFloat(e.target.value) || 0 })} 
+                  placeholder="Ex: 1.0850"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="label">Take Profit (TP)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  className="input" 
+                  value={newTrade.tp || ''} 
+                  onChange={e => setNewTrade({ ...newTrade, tp: parseFloat(e.target.value) || 0 })} 
+                  placeholder="Ex: 1.0950"
+                />
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="label">Tags</label>
+                <div className="tag-grid">
+                  {state.tags.map(tag => {
+                    const isSelected = newTrade.tagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          const nextTags = isSelected
+                            ? newTrade.tagIds.filter(id => id !== tag.id)
+                            : [...newTrade.tagIds, tag.id];
+                          setNewTrade({ ...newTrade, tagIds: nextTags });
+                        }}
+                        style={{
+                          background: isSelected ? tag.color : 'transparent',
+                          color: isSelected ? '#fff' : tag.color,
+                          border: `1px solid ${tag.color}`,
+                          borderRadius: '6px', 
+                          padding: '4px 10px', 
+                          fontSize: '12px',
+                          fontWeight: 600, 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAddTrade(false)}>Annuler</button>
@@ -571,13 +793,217 @@ export default function JournalPage() {
                     commission: 0,
                     swap: 0,
                     profitNet: newTrade.status === 'closed' ? newTrade.profitNet : 0,
-                    strategyId: null,
-                    tagIds: [],
+                    strategyId: newTrade.strategyId || null,
+                    tagIds: newTrade.tagIds,
                     notes: '',
                     imageUrl: null,
-                    rMultiple: null
+                    rMultiple: newTrade.rMultiple !== 0 ? newTrade.rMultiple : null,
+                    sl: newTrade.sl !== 0 ? newTrade.sl : null,
+                    tp: newTrade.tp !== 0 ? newTrade.tp : null
                   }]);
                   setShowAddTrade(false);
+                }}
+              >
+                Sauvegarder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Trade Modal */}
+      {editingTrade && editingTradeData && (
+        <div className="modal-overlay" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title flex items-center gap-2">Modifier le Trade</h2>
+              <button className="modal-close" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}><X size={20} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="label">Statut du Trade</label>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                    <input type="radio" name="editStatus" checked={editingTradeData.status === 'closed'} onChange={() => setEditingTradeData({ ...editingTradeData, status: 'closed' })} />
+                    Terminé
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                    <input type="radio" name="editStatus" checked={editingTradeData.status === 'open'} onChange={() => setEditingTradeData({ ...editingTradeData, status: 'open' })} />
+                    En cours
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                    <input type="radio" name="editStatus" checked={editingTradeData.status === 'pending'} onChange={() => setEditingTradeData({ ...editingTradeData, status: 'pending' })} />
+                    En attente
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="label">Symbole</label>
+                <input className="input" value={editingTradeData.symbol} onChange={e => {
+                  const sym = e.target.value.toUpperCase();
+                  const mult = state.symbolSettings?.[sym]?.multiplier || 100000;
+                  setEditingTradeData({ ...editingTradeData, symbol: sym, multiplier: mult });
+                }} />
+              </div>
+              <div className="form-group">
+                <label className="label">Direction</label>
+                <select className="select" value={editingTradeData.direction} onChange={e => setEditingTradeData({ ...editingTradeData, direction: e.target.value as 'long'|'short' })}>
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="label">Date d'ouverture</label>
+                <input type="datetime-local" className="input" value={editingTradeData.openTime} onChange={e => setEditingTradeData({ ...editingTradeData, openTime: e.target.value })} />
+              </div>
+              {editingTradeData.status === 'closed' && (
+                <div className="form-group">
+                  <label className="label">Date de fermeture</label>
+                  <input type="datetime-local" className="input" value={editingTradeData.closeTime} onChange={e => setEditingTradeData({ ...editingTradeData, closeTime: e.target.value })} />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="label">Prix d'entrée</label>
+                <input type="number" step="any" className="input" value={editingTradeData.openPrice} onChange={e => setEditingTradeData({ ...editingTradeData, openPrice: parseFloat(e.target.value) || 0 })} />
+              </div>
+              
+              {editingTradeData.status === 'closed' ? (
+                <div className="form-group">
+                  <label className="label">Prix de sortie</label>
+                  <input type="number" step="any" className="input" value={editingTradeData.closePrice} onChange={e => setEditingTradeData({ ...editingTradeData, closePrice: parseFloat(e.target.value) || 0 })} />
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="label">Multiplicateur (Valeur du point)</label>
+                  <input type="number" step="any" className="input" value={editingTradeData.multiplier} onChange={e => setEditingTradeData({ ...editingTradeData, multiplier: parseFloat(e.target.value) || 1 })} />
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="label">Volume (Lots)</label>
+                <input type="number" step="0.01" className="input" value={editingTradeData.volume} onChange={e => setEditingTradeData({ ...editingTradeData, volume: parseFloat(e.target.value) || 0 })} />
+              </div>
+              {editingTradeData.status === 'closed' ? (
+                <div className="form-group">
+                  <label className="label">Profit Net ($)</label>
+                  <input type="number" step="any" className="input" value={editingTradeData.profitNet} onChange={e => setEditingTradeData({ ...editingTradeData, profitNet: parseFloat(e.target.value) || 0 })} />
+                </div>
+              ) : (
+                <div className="form-group" style={{ height: 0 }}></div>
+              )}
+
+              <div className="form-group">
+                <label className="label">Stratégie</label>
+                <select 
+                  className="select" 
+                  value={editingTradeData.strategyId} 
+                  onChange={e => setEditingTradeData({ ...editingTradeData, strategyId: e.target.value })}
+                >
+                  <option value="">Aucune stratégie</option>
+                  {state.strategies.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="label">R:R (Multiple R)</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  className="input" 
+                  value={editingTradeData.rMultiple} 
+                  onChange={e => setEditingTradeData({ ...editingTradeData, rMultiple: parseFloat(e.target.value) || 0 })} 
+                  placeholder="Ex: 2.5"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="label">Stop Loss (SL)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  className="input" 
+                  value={editingTradeData.sl || ''} 
+                  onChange={e => setEditingTradeData({ ...editingTradeData, sl: parseFloat(e.target.value) || 0 })} 
+                  placeholder="Ex: 1.0850"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="label">Take Profit (TP)</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  className="input" 
+                  value={editingTradeData.tp || ''} 
+                  onChange={e => setEditingTradeData({ ...editingTradeData, tp: parseFloat(e.target.value) || 0 })} 
+                  placeholder="Ex: 1.0950"
+                />
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="label">Tags</label>
+                <div className="tag-grid">
+                  {state.tags.map(tag => {
+                    const isSelected = editingTradeData.tagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => {
+                          const nextTags = isSelected
+                            ? editingTradeData.tagIds.filter((id: string) => id !== tag.id)
+                            : [...editingTradeData.tagIds, tag.id];
+                          setEditingTradeData({ ...editingTradeData, tagIds: nextTags });
+                        }}
+                        style={{
+                          background: isSelected ? tag.color : 'transparent',
+                          color: isSelected ? '#fff' : tag.color,
+                          border: `1px solid ${tag.color}`,
+                          borderRadius: '6px', 
+                          padding: '4px 10px', 
+                          fontSize: '12px',
+                          fontWeight: 600, 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>Annuler</button>
+              <button 
+                className="btn btn-accent" 
+                onClick={() => {
+                  updateTrade(editingTrade.id, {
+                    symbol: editingTradeData.symbol,
+                    direction: editingTradeData.direction,
+                    status: editingTradeData.status,
+                    openTime: new Date(editingTradeData.openTime).toISOString(),
+                    closeTime: editingTradeData.status === 'closed' ? new Date(editingTradeData.closeTime).toISOString() : null,
+                    openPrice: editingTradeData.openPrice,
+                    closePrice: editingTradeData.status === 'closed' ? editingTradeData.closePrice : null,
+                    volume: editingTradeData.volume,
+                    multiplier: editingTradeData.multiplier,
+                    profitGross: editingTradeData.status === 'closed' ? editingTradeData.profitNet : 0,
+                    profitNet: editingTradeData.status === 'closed' ? editingTradeData.profitNet : 0,
+                    rMultiple: editingTradeData.rMultiple !== 0 ? editingTradeData.rMultiple : null,
+                    strategyId: editingTradeData.strategyId || null,
+                    tagIds: editingTradeData.tagIds,
+                    sl: editingTradeData.sl !== 0 ? editingTradeData.sl : null,
+                    tp: editingTradeData.tp !== 0 ? editingTradeData.tp : null,
+                  });
+                  setEditingTrade(null);
+                  setEditingTradeData(null);
                 }}
               >
                 Sauvegarder

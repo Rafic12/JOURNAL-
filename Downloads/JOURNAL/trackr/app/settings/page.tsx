@@ -152,6 +152,13 @@ export default function SettingsPage() {
             onChange={e => updateSettings({ apiKeys: { finnhub: e.target.value } })} 
           />
         </div>
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label className="label">Twelve Data API Key</label>
+          <input className="input" type="password" placeholder="93775..."
+            value={state.apiKeys?.twelveData || ''} 
+            onChange={e => updateSettings({ apiKeys: { twelveData: e.target.value } })} 
+          />
+        </div>
       </div>
 
       <div className="card" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>

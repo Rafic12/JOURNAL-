@@ -25,17 +25,24 @@ interface LocalPrefs {
 
 function loadPrefs(userId: string): LocalPrefs {
   if (typeof window === 'undefined') {
-    return { activeAccountId: null, theme: 'green', symbolSettings: {}, apiKeys: {} };
+    return { activeAccountId: null, theme: 'green', symbolSettings: {}, apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' } };
   }
   try {
     const raw = localStorage.getItem(PREFS_KEY_PREFIX + userId);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.apiKeys) parsed.apiKeys = {};
+      if (!parsed.apiKeys.twelveData) {
+        parsed.apiKeys.twelveData = '93775736c5474430ab18f4d1dcfea75b';
+      }
+      return parsed;
+    }
   } catch { /* ignore */ }
   return {
     activeAccountId: null,
     theme: 'green',
     symbolSettings: { 'US30': { multiplier: 10 }, 'EURUSD': { multiplier: 100000 } },
-    apiKeys: {},
+    apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' },
   };
 }
 
@@ -295,7 +302,7 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
       activeAccountId: null,
       theme: keptTheme,
       symbolSettings: { 'US30': { multiplier: 10 }, 'EURUSD': { multiplier: 100000 } },
-      apiKeys: {},
+      apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' },
     });
   }, [userId, state.theme]);
 
