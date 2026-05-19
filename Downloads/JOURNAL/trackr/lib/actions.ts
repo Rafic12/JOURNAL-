@@ -11,11 +11,20 @@ export async function dbGetAccounts() {
 }
 
 export async function dbCreateAccount(data: any) {
-  return await prisma.account.create({ data });
+  const { createdAt, ...rest } = data;
+  return await prisma.account.create({
+    data: {
+      ...rest,
+      createdAt: createdAt ? new Date(createdAt) : new Date()
+    }
+  });
 }
 
 export async function dbUpdateAccount(id: string, data: any) {
-  return await prisma.account.update({ where: { id }, data });
+  const { createdAt, ...rest } = data;
+  const updateData: any = { ...rest };
+  if (createdAt) updateData.createdAt = new Date(createdAt);
+  return await prisma.account.update({ where: { id }, data: updateData });
 }
 
 export async function dbDeleteAccount(id: string) {

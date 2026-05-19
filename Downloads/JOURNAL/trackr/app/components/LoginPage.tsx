@@ -24,41 +24,59 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
+  const [step, setStep] = useState<'email' | 'otp'>('email');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
-      setError('Veuillez remplir tous les champs');
+    if (!email) {
+      setError('Veuillez entrer une adresse email');
       return;
     }
 
-    if (mode === 'register' && !name) {
-      setError('Veuillez entrer votre nom');
-      return;
-    }
-
-    if (password.length < 4) {
-      setError('Le mot de passe doit contenir au moins 4 caractères');
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Veuillez entrer un email valide');
       return;
     }
 
     setLoading(true);
+    // Simulate network request to send OTP
+    await new Promise(r => setTimeout(r, 1000));
 
-    // Simulated auth delay
-    await new Promise(r => setTimeout(r, 800));
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(code);
+    setToastMessage(`🔑 Code de connexion sécurisé envoyé !`);
+    setStep('otp');
+    setLoading(false);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!otp || otp.length !== 6) {
+      setError('Veuillez entrer le code de 6 chiffres');
+      return;
+    }
+
+    if (otp !== generatedOtp) {
+      setError('Code incorrect. Veuillez réessayer.');
+      return;
+    }
+
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 600));
 
     const user: AuthUser = {
       email,
-      name: name || email.split('@')[0],
+      name: email.split('@')[0],
       avatar: email.charAt(0).toUpperCase(),
     };
 
@@ -128,91 +146,124 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* Right: Form */}
         <div className="login-form-side">
+          {toastMessage && (
+            <div style={{
+              position: 'fixed', top: 24, right: 24, zIndex: 1000,
+              background: 'rgba(7, 11, 9, 0.95)', border: '2px solid var(--accent)',
+              borderRadius: 12, padding: '16px 20px', color: '#fff',
+              boxShadow: '0 8px 32px rgba(0, 230, 118, 0.25)', backdropFilter: 'blur(8px)',
+              maxWidth: 350, animation: 'fadeIn 0.3s ease-out'
+            }}>
+              <p style={{ fontWeight: 700, color: 'var(--accent)', fontSize: 14, marginBottom: 4 }}>🔑 OTP Généré !</p>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                Voici votre code de connexion sécurisé :
+              </p>
+              <p style={{ fontSize: 28, fontWeight: 800, letterSpacing: 4, margin: '8px 0', color: '#fff', textAlign: 'center', fontFamily: 'monospace' }}>
+                {generatedOtp}
+              </p>
+              <button 
+                onClick={() => setToastMessage(null)}
+                style={{ fontSize: 11, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Fermer la notification
+              </button>
+            </div>
+          )}
+
           <div className="login-form-wrapper">
             <div className="login-form-header">
               <h2 className="login-form-title">
-                {mode === 'login' ? 'Bon retour 👋' : 'Créer un compte'}
+                {step === 'email' ? 'Connexion Sécurisée' : 'Vérification OTP'}
               </h2>
               <p className="login-form-subtitle">
-                {mode === 'login'
-                  ? 'Connectez-vous pour accéder à votre journal'
-                  : 'Commencez à tracker vos performances'}
+                {step === 'email'
+                  ? 'Entrez votre email pour recevoir votre code temporaire'
+                  : `Saisissez le code à 6 chiffres envoyé à ${email}`}
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="login-form">
-              {mode === 'register' && (
+            {step === 'email' ? (
+              <form onSubmit={handleSendOtp} className="login-form">
                 <div className="login-field">
-                  <label className="label">Nom complet</label>
+                  <label className="label">Adresse Email</label>
                   <div className="login-input-wrapper">
+                    <Mail size={16} className="login-input-icon" />
                     <input
                       className="input"
-                      type="text"
-                      placeholder="John Doe"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      autoComplete="name"
+                      type="email"
+                      placeholder="trader@example.com"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      style={{ paddingLeft: 40 }}
+                      autoComplete="email"
+                      required
                     />
                   </div>
                 </div>
-              )}
 
-              <div className="login-field">
-                <label className="label">Email</label>
-                <div className="login-input-wrapper">
-                  <Mail size={16} className="login-input-icon" />
-                  <input
-                    className="input"
-                    type="email"
-                    placeholder="trader@example.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    style={{ paddingLeft: 40 }}
-                    autoComplete="email"
-                  />
-                </div>
-              </div>
-
-              <div className="login-field">
-                <label className="label">Mot de passe</label>
-                <div className="login-input-wrapper">
-                  <Lock size={16} className="login-input-icon" />
-                  <input
-                    className="input"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    style={{ paddingLeft: 40, paddingRight: 40 }}
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  />
-                  <button
-                    type="button"
-                    className="login-toggle-pw"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div className="login-error">
-                  {error}
-                </div>
-              )}
-
-              <button type="submit" className="login-submit" disabled={loading}>
-                {loading ? (
-                  <div className="login-spinner" />
-                ) : (
-                  <>
-                    {mode === 'login' ? 'Se connecter' : "S'inscrire"}
-                    <ArrowRight size={18} />
-                  </>
+                {error && (
+                  <div className="login-error">
+                    {error}
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <button type="submit" className="login-submit" disabled={loading}>
+                  {loading ? (
+                    <div className="login-spinner" />
+                  ) : (
+                    <>
+                      Recevoir le code OTP
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="login-form">
+                <div className="login-field">
+                  <label className="label">Code de validation (6 chiffres)</label>
+                  <div className="login-input-wrapper">
+                    <Lock size={16} className="login-input-icon" />
+                    <input
+                      className="input"
+                      type="text"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                      style={{ paddingLeft: 40, letterSpacing: 6, fontSize: 18, fontWeight: 700 }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="login-error">
+                    {error}
+                  </div>
+                )}
+
+                <button type="submit" className="login-submit" disabled={loading}>
+                  {loading ? (
+                    <div className="login-spinner" />
+                  ) : (
+                    <>
+                      Valider et se connecter
+                      <ArrowRight size={18} />
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary w-full"
+                  onClick={() => { setStep('email'); setOtp(''); setError(''); }}
+                  style={{ marginTop: 12, display: 'flex', justifyContent: 'center', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                >
+                  Retour
+                </button>
+              </form>
+            )}
 
             <div className="login-separator">
               <span>ou</span>
@@ -230,14 +281,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <TrendingUp size={18} />
               Accès démo instantané
             </button>
-
-            <p className="login-switch">
-              {mode === 'login' ? (
-                <>Pas encore de compte ? <button type="button" onClick={() => { setMode('register'); setError(''); }}>S&apos;inscrire</button></>
-              ) : (
-                <>Déjà un compte ? <button type="button" onClick={() => { setMode('login'); setError(''); }}>Se connecter</button></>
-              )}
-            </p>
           </div>
         </div>
       </div>
