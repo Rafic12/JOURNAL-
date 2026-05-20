@@ -764,7 +764,7 @@ export default function JournalPage() {
                 </div>
                 {editingTradeData.status === 'closed' && (
                   <span className={`trade-detail-pnl ${editingTradeData.profitNet >= 0 ? 'text-win' : 'text-loss'}`}>
-                    {editingTradeData.profitNet >= 0 ? '+' : ''}{formatCurrency(editingTradeData.profitNet)}
+                    {formatCurrency(editingTradeData.profitNet)}
                   </span>
                 )}
               </div>
