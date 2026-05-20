@@ -1451,3 +1451,136 @@ body {
   gap: 8px;
 }
 
+/* ===== Responsive Utilities & Media Queries ===== */
+
+.mobile-menu-btn {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+@media (max-width: 1024px) {
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: 20px 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding-top: 64px;
+  }
+
+  .page-container {
+    padding: 16px !important;
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .card {
+    padding: 16px !important;
+  }
+
+  .card-value {
+    font-size: 22px !important;
+  }
+
+  /* Modals responsiveness */
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    max-height: 95vh !important;
+    overflow-y: auto !important;
+    padding: 16px !important;
+  }
+
+  /* Forms responsiveness */
+  .form-row, 
+  div[style*="display: grid"][style*="grid-template-columns"], 
+  div[style*="display: grid"][style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Trade list mobile adaptations */
+  .trades-table-container,
+  div[style*="overflow-x: auto"],
+  div[style*="overflowX: auto"] {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+  }
+
+  /* Calendar mobile adjustments */
+  .calendar-grid {
+    gap: 4px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 22px !important;
+  }
+
+  .page-subtitle {
+    font-size: 12px !important;
+  }
+
+  /* Adjust calendars cells */
+  .calendar-day-header {
+    font-size: 9px !important;
+    padding: 4px 2px !important;
+  }
+
+  .calendar-day-cell {
+    min-height: 55px !important;
+    padding: 4px !important;
+  }
+
+  .calendar-day-number {
+    font-size: 10px !important;
+  }
+
+  .calendar-day-pnl {
+    font-size: 9px !important;
+  }
+}
+
