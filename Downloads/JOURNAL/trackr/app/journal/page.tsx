@@ -406,218 +406,49 @@ export default function JournalPage() {
         )}
       </div>
 
-      {/* Table */}
+      {/* Trade Cards */}
       {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">
-            <Search size={48} />
-          </div>
+          <div className="empty-state-icon"><Search size={48} /></div>
           <h3 className="empty-state-title">Aucun trade trouvé</h3>
           <p className="empty-state-desc">Importez des trades ou ajustez vos filtres.</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th onClick={() => handleSort('closeTime')}>
-                  <span className="flex items-center gap-2">Date <SortIcon field="closeTime" /></span>
-                </th>
-                <th onClick={() => handleSort('symbol')}>
-                  <span className="flex items-center gap-2">Symbole <SortIcon field="symbol" /></span>
-                </th>
-                <th onClick={() => handleSort('direction')}>
-                  <span className="flex items-center gap-2">Direction <SortIcon field="direction" /></span>
-                </th>
-                <th onClick={() => handleSort('volume')}>
-                  <span className="flex items-center gap-2">Volume <SortIcon field="volume" /></span>
-                </th>
-                <th>Prix Entrée</th>
-                <th>Prix Sortie</th>
-                <th>SL</th>
-                <th>TP</th>
-                <th onClick={() => handleSort('rMultiple')}>
-                  <span className="flex items-center gap-2">R:R <SortIcon field="rMultiple" /></span>
-                </th>
-                <th onClick={() => handleSort('profitNet')}>
-                  <span className="flex items-center gap-2">P&L <SortIcon field="profitNet" /></span>
-                </th>
-                <th>Stratégie</th>
-                <th>Tags</th>
-                <th>Capture</th>
-                <th>Notes</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.slice(0, 100).map(trade => (
-                <tr 
-                  key={trade.id}
-                  onClick={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest('button') || target.closest('input') || target.closest('img') || target.closest('select')) {
-                      return;
-                    }
-                    startEditing(trade);
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <td>
-                    {trade.status === 'open' ? (
-                      <div>
-                        <span className="badge badge-neutral" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>EN COURS</span><br/>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {formatTime(trade.openTime)}
-                        </span>
-                      </div>
-                    ) : trade.status === 'pending' ? (
-                      <div>
-                        <span className="badge badge-neutral" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent)' }}>EN ATTENTE</span><br/>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {formatTime(trade.openTime)}
-                        </span>
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="mono" style={{ fontSize: 13 }}>{trade.closeTime ? formatDate(trade.closeTime) : '-'}</span>
-                        <br />
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {formatTime(trade.openTime)} → {trade.closeTime ? formatTime(trade.closeTime) : ''}
-                        </span>
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <span className="mono" style={{ fontWeight: 600 }}>{trade.symbol}</span>
-                  </td>
-                  <td>
-                    <span className={`badge badge-${trade.direction}`}>
-                      {trade.direction.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="mono">{trade.volume}</td>
-                  <td className="mono">{trade.openPrice}</td>
-                  <td className="mono">{trade.closePrice !== null ? trade.closePrice : '-'}</td>
-                  <td className="mono">{trade.sl !== null && trade.sl !== undefined ? trade.sl : '—'}</td>
-                  <td className="mono">{trade.tp !== null && trade.tp !== undefined ? trade.tp : '—'}</td>
-                  <td>
-                    {trade.rMultiple !== null && trade.rMultiple !== undefined ? (
-                      <span className={`badge ${trade.rMultiple >= 0 ? 'badge-win' : 'badge-loss'}`} style={{ fontWeight: 700 }}>
-                        {trade.rMultiple >= 0 ? `+${trade.rMultiple.toFixed(2)}R` : `${trade.rMultiple.toFixed(2)}R`}
-                      </span>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    {trade.status === 'open' || trade.status === 'pending' ? (
-                      <span className="mono text-muted" style={{ fontWeight: 700 }}>
-                        -
-                      </span>
-                    ) : (
-                      <span className={`mono ${trade.profitNet >= 0 ? 'text-win' : 'text-loss'}`} style={{ fontWeight: 700 }}>
-                        {formatCurrency(trade.profitNet)}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ fontSize: 12 }}>{getStrategyName(trade.strategyId)}</td>
-                  <td>
-                    <div className="tag-grid">
-                      {getTagsForTrade(trade).map(tag => (
-                        <span
-                          key={tag.id}
-                          className="tag-badge"
-                          style={{
-                            background: `${tag.color}20`,
-                            color: tag.color,
-                          }}
-                        >
-                          {tag.name}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  {/* Screenshot Column */}
-                  <td>
-                    {trade.imageUrl ? (
-                      <div className="flex items-center gap-2">
-                        <img
-                          src={trade.imageUrl}
-                          alt="Capture"
-                          className="screenshot-thumb"
-                          onClick={() => setLightboxImage(trade.imageUrl)}
-                        />
-                        <button
-                          className="btn btn-sm btn-danger"
-                          onClick={() => handleRemoveScreenshot(trade.id)}
-                          style={{ padding: 4 }}
-                          title="Supprimer la capture"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        className="screenshot-upload-btn"
-                        onClick={() => handleScreenshotUpload(trade.id)}
-                        title="Ajouter une capture d'écran"
-                      >
-                        <Camera size={16} />
-                      </button>
-                    )}
-                  </td>
-                  <td>
-                    {editingNote === trade.id ? (
-                      <div className="flex gap-2">
-                        <input
-                          className="input"
-                          style={{ minWidth: 140, padding: '4px 8px', fontSize: 12 }}
-                          value={noteText}
-                          onChange={e => setNoteText(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleSaveNote(trade.id)}
-                          autoFocus
-                        />
-                        <button className="btn btn-sm btn-accent" onClick={() => handleSaveNote(trade.id)}>OK</button>
-                      </div>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 12,
-                          color: trade.notes ? 'var(--text-secondary)' : 'var(--text-muted)',
-                          cursor: 'pointer',
-                          maxWidth: 120,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                        }}
-                        onClick={() => { setEditingNote(trade.id); setNoteText(trade.notes); }}
-                        title={trade.notes || 'Cliquez pour ajouter une note'}
-                      >
-                        {trade.notes || '+ Note'}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => {
-                        if (confirm('Supprimer ce trade ?')) deleteTrade(trade.id);
-                      }}
-                      style={{ padding: 6 }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {filtered.length > 100 && (
-            <p style={{ textAlign: 'center', padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>
-              Affichage des 100 premiers trades sur {filtered.length}
-            </p>
-          )}
+        <div className="trade-cards-list">
+          {filtered.slice(0, 100).map(trade => (
+            <div key={trade.id} className="trade-card" onClick={() => startEditing(trade)}>
+              <div className="trade-card-left">
+                <div className="trade-card-indicator" style={{ background: trade.status === 'open' ? 'var(--accent)' : trade.profitNet >= 0 ? 'var(--win)' : 'var(--loss)' }} />
+                <div>
+                  <div className="trade-card-symbol">{trade.symbol}</div>
+                  <div className="trade-card-meta">
+                    {trade.status === 'open' ? 'En cours' : trade.status === 'pending' ? 'En attente' : (trade.closeTime ? formatDate(trade.closeTime) : '')} · {formatTime(trade.openTime)}
+                  </div>
+                </div>
+              </div>
+              <div className="trade-card-center">
+                <span className={`badge badge-${trade.direction}`}>{trade.direction.toUpperCase()}</span>
+                <span className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{trade.volume} lots</span>
+                {getStrategyName(trade.strategyId) !== '—' && <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '2px 8px', borderRadius: 4 }}>{getStrategyName(trade.strategyId)}</span>}
+              </div>
+              <div className="trade-card-right">
+                {trade.rMultiple != null && (
+                  <span className={`badge ${trade.rMultiple >= 0 ? 'badge-win' : 'badge-loss'}`} style={{ fontWeight: 700, fontSize: 11 }}>
+                    {trade.rMultiple >= 0 ? '+' : ''}{trade.rMultiple.toFixed(2)}R
+                  </span>
+                )}
+                <div className="trade-card-pnl">
+                  {trade.status === 'closed' ? (
+                    <span className={trade.profitNet >= 0 ? 'text-win' : 'text-loss'}>{formatCurrency(trade.profitNet)}</span>
+                  ) : <span className="text-muted">—</span>}
+                </div>
+                <button className="btn btn-sm btn-danger trade-card-delete" onClick={(e) => { e.stopPropagation(); if (confirm('Supprimer ce trade ?')) deleteTrade(trade.id); }} style={{ padding: 6 }}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {filtered.length > 100 && <p style={{ textAlign: 'center', padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>Affichage des 100 premiers trades sur {filtered.length}</p>}
         </div>
       )}
 
@@ -897,32 +728,49 @@ export default function JournalPage() {
         </div>
       )}
 
-      {/* Edit Trade Modal */}
+      {/* Trade Detail Panel */}
       {editingTrade && editingTradeData && (
-        <div className="modal-overlay" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title flex items-center gap-2">Modifier le Trade</h2>
-              <button className="modal-close" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}><X size={20} /></button>
-            </div>
-            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="label">Statut du Trade</label>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
-                    <input type="radio" name="editStatus" checked={editingTradeData.status === 'closed'} onChange={() => setEditingTradeData({ ...editingTradeData, status: 'closed' })} />
-                    Terminé
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
-                    <input type="radio" name="editStatus" checked={editingTradeData.status === 'open'} onChange={() => setEditingTradeData({ ...editingTradeData, status: 'open' })} />
-                    En cours
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
-                    <input type="radio" name="editStatus" checked={editingTradeData.status === 'pending'} onChange={() => setEditingTradeData({ ...editingTradeData, status: 'pending' })} />
-                    En attente
-                  </label>
+        <div className="trade-detail-overlay" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>
+          <div className="trade-detail-panel" onClick={e => e.stopPropagation()}>
+            {/* Header: Screenshot or placeholder */}
+            {editingTrade.imageUrl ? (
+              <div style={{ position: 'relative' }}>
+                <img src={editingTrade.imageUrl} alt="Capture" className="trade-detail-header-img" />
+                <div className="trade-detail-topbar">
+                  <button className="btn btn-sm btn-secondary" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }} style={{ background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff' }}>← Retour</button>
+                  <button className="btn btn-sm btn-danger" onClick={() => handleRemoveScreenshot(editingTrade.id)} style={{ background: 'rgba(0,0,0,0.5)', border: 'none' }}>
+                    <X size={14} /> Supprimer la capture
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div className="trade-detail-header-placeholder">
+                <div className="trade-detail-topbar">
+                  <button className="btn btn-sm btn-secondary" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>← Retour</button>
+                  <button className="btn btn-sm btn-secondary" onClick={() => handleScreenshotUpload(editingTrade.id)}>
+                    <Camera size={14} /> Ajouter une capture
+                  </button>
+                </div>
+                <ImageIcon size={40} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+              </div>
+            )}
+
+            {/* Title row */}
+            <div className="trade-detail-body">
+              <div className="trade-detail-title-row">
+                <div className="flex items-center gap-3">
+                  <span className="trade-detail-symbol">{editingTradeData.symbol}</span>
+                  <span className={`badge badge-${editingTradeData.direction}`}>{editingTradeData.direction.toUpperCase()}</span>
+                </div>
+                {editingTradeData.status === 'closed' && (
+                  <span className={`trade-detail-pnl ${editingTradeData.profitNet >= 0 ? 'text-win' : 'text-loss'}`}>
+                    {editingTradeData.profitNet >= 0 ? '+' : ''}{formatCurrency(editingTradeData.profitNet)}
+                  </span>
+                )}
+              </div>
+
+              {/* Editable Form */}
+              <div className="trade-detail-form">
 
               <div className="form-group" style={{ position: 'relative' }}>
                 <label className="label">Symbole (Recherche Yahoo Finance)</label>
@@ -1076,42 +924,38 @@ export default function JournalPage() {
                 />
               </div>
 
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="label">Tags</label>
-                <div className="tag-grid">
-                  {state.tags.map(tag => {
-                    const isSelected = editingTradeData.tagIds.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => {
-                          const nextTags = isSelected
-                            ? editingTradeData.tagIds.filter((id: string) => id !== tag.id)
-                            : [...editingTradeData.tagIds, tag.id];
-                          setEditingTradeData({ ...editingTradeData, tagIds: nextTags });
-                        }}
-                        style={{
-                          background: isSelected ? tag.color : 'transparent',
-                          color: isSelected ? '#fff' : tag.color,
-                          border: `1px solid ${tag.color}`,
-                          borderRadius: '6px', 
-                          padding: '4px 10px', 
-                          fontSize: '12px',
-                          fontWeight: 600, 
-                          cursor: 'pointer', 
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
+              <div className="form-group full-width">
+                <label className="label">Statut</label>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {(['closed', 'open', 'pending'] as const).map(s => (
+                    <label key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                      <input type="radio" name="editStatus" checked={editingTradeData.status === s} onChange={() => setEditingTradeData({ ...editingTradeData, status: s })} />
+                      {s === 'closed' ? 'Terminé' : s === 'open' ? 'En cours' : 'En attente'}
+                    </label>
+                  ))}
                 </div>
               </div>
+
+              <div className="form-group full-width">
+                <label className="label">Notes</label>
+                <textarea
+                  className="input"
+                  rows={3}
+                  value={editingTradeData.notes ?? editingTrade.notes ?? ''}
+                  onChange={e => setEditingTradeData({ ...editingTradeData, notes: e.target.value })}
+                  placeholder="Ajoutez vos notes ici..."
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              </div>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>Annuler</button>
+
+            <div className="trade-detail-footer">
+              <button className="btn btn-danger" onClick={() => { if (confirm('Supprimer ce trade ?')) { deleteTrade(editingTrade.id); setEditingTrade(null); setEditingTradeData(null); } }}>
+                <Trash2 size={14} /> Supprimer
+              </button>
+              <div className="flex gap-2">
+                <button className="btn btn-secondary" onClick={() => { setEditingTrade(null); setEditingTradeData(null); }}>Annuler</button>
               <button 
                 className="btn btn-accent" 
                 onClick={() => {
@@ -1132,6 +976,7 @@ export default function JournalPage() {
                     tagIds: editingTradeData.tagIds,
                     sl: editingTradeData.sl !== 0 ? editingTradeData.sl : null,
                     tp: editingTradeData.tp !== 0 ? editingTradeData.tp : null,
+                    notes: editingTradeData.notes ?? editingTrade.notes ?? '',
                   });
                   setEditingTrade(null);
                   setEditingTradeData(null);
@@ -1139,6 +984,7 @@ export default function JournalPage() {
               >
                 Sauvegarder
               </button>
+              </div>
             </div>
           </div>
         </div>
