@@ -111,7 +111,7 @@ export default function DashboardPage() {
           <p className="dashboard-welcome-sub">
             {todayTrades.length > 0 
               ? `${todayTrades.length} trade${todayTrades.length > 1 ? 's' : ''} aujourd'hui · ${todayPnL >= 0 ? '+' : ''}${formatCurrency(todayPnL)}`
-              : `${kpis.totalTrades} trades au total · Commencez votre session`
+              : `${kpis.totalTrades} trade${kpis.totalTrades > 1 ? 's' : ''} au total · Commencez votre session`
             }
           </p>
         </div>
