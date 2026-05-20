@@ -23,7 +23,7 @@ export function calculateKPIs(trades: Trade[]): KPIMetrics {
   const losses = sorted.filter(t => t.profitNet < 0);
 
   const totalPnL = sorted.reduce((s, t) => s + t.profitNet, 0);
-  const winRate = (wins.length / sorted.length) * 100;
+  const winRate = sorted.length > 0 ? (wins.length / sorted.length) * 100 : 0;
 
   const totalGross = wins.reduce((s, t) => s + t.profitNet, 0);
   const totalLoss = Math.abs(losses.reduce((s, t) => s + t.profitNet, 0));
@@ -37,8 +37,8 @@ export function calculateKPIs(trades: Trade[]): KPIMetrics {
 
   // Sharpe Ratio (annualized, assuming ~252 trading days)
   const returns = sorted.map(t => t.profitNet);
-  const meanReturn = returns.reduce((s, r) => s + r, 0) / returns.length;
-  const variance = returns.reduce((s, r) => s + Math.pow(r - meanReturn, 2), 0) / returns.length;
+  const meanReturn = returns.length > 0 ? returns.reduce((s, r) => s + r, 0) / returns.length : 0;
+  const variance = returns.length > 0 ? returns.reduce((s, r) => s + Math.pow(r - meanReturn, 2), 0) / returns.length : 0;
   const stdDev = Math.sqrt(variance);
   const sharpeRatio = stdDev > 0 ? (meanReturn / stdDev) * Math.sqrt(252) : 0;
 
