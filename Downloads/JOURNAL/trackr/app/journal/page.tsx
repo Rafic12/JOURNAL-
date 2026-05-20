@@ -49,20 +49,10 @@ export default function JournalPage() {
   const [showLookupDropdown, setShowLookupDropdown] = useState(false);
 
   const cleanSymbol = (sym: string): string => {
-    const s = sym.toUpperCase().replace('/', '');
-    if (s === 'EURUSD=X') return 'EURUSD';
-    if (s === 'GBPUSD=X') return 'GBPUSD';
-    if (s === 'USDJPY=X') return 'USDJPY';
-    if (s === 'AUDUSD=X') return 'AUDUSD';
-    if (s === 'USDCAD=X') return 'USDCAD';
-    if (s === 'USDCHF=X') return 'USDCHF';
-    if (s === 'GC=F') return 'XAUUSD';
-    if (s === '^DJI') return 'US30';
-    if (s === '^IXIC') return 'NAS100';
-    if (s === '^GSPC') return 'SPX500';
-    if (s === 'BTC-USD') return 'BTCUSD';
-    if (s === 'ETH-USD') return 'ETHUSD';
-    if (s === 'SOL-USD') return 'SOLUSD';
+    const s = sym.toUpperCase().replace('/', '').replace(' ', '').trim();
+    if (s === 'DJI') return 'US30';
+    if (s === 'IXIC') return 'NAS100';
+    if (s === 'SPX') return 'SPX500';
     return s;
   };
 

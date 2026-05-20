@@ -33,6 +33,8 @@
   --cyan: #06b6d4;
   --sidebar-width: 260px;
   --sidebar-collapsed: 72px;
+  --font-numbers: 'Share Tech Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-letters: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 [data-theme="light"] {
@@ -95,7 +97,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-letters);
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
@@ -105,7 +107,7 @@ body {
 }
 
 .mono {
-  font-family: 'Share Tech Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-numbers);
 }
 
 /* ===== Scrollbar ===== */
@@ -319,7 +321,7 @@ body {
 }
 
 .card-value {
-  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  font-family: var(--font-numbers);
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -543,7 +545,7 @@ body {
 }
 
 .calendar-day-pnl {
-  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  font-family: var(--font-numbers);
   font-size: 13px;
   font-weight: 600;
   margin-top: auto;
@@ -956,7 +958,7 @@ body {
 }
 
 .custom-tooltip .value {
-  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  font-family: var(--font-numbers);
   font-size: 14px;
   font-weight: 600;
 }

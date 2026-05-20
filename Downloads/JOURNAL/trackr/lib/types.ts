@@ -69,6 +69,8 @@ export interface AppState {
   theme: string;
   symbolSettings: Record<string, { multiplier: number }>;
   apiKeys: { twelvedata?: string; twelveData?: string; finnhub?: string; polygon?: string };
+  fontNumbers?: string;
+  fontLetters?: string;
 }
 
 // KPI Metrics computed from trades

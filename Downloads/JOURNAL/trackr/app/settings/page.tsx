@@ -97,6 +97,48 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Fonts Card */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="flex items-center gap-3 mb-6">
+          <Palette size={20} className="text-accent" />
+          <h2 style={{ fontSize: 16, fontWeight: 600 }}>Polices d'Écriture</h2>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="form-group">
+            <label className="label">Police des chiffres (Chiffres & Métriques)</label>
+            <select 
+              className="input" 
+              value={state.fontNumbers || 'Share Tech Mono'}
+              onChange={e => updateSettings({ fontNumbers: e.target.value })}
+              style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            >
+              <option value="Share Tech Mono">Share Tech Mono (Dotted Zeros - Futuriste)</option>
+              <option value="JetBrains Mono">JetBrains Mono (Technique Pro)</option>
+              <option value="Inter">Inter (Épuré & Moderne)</option>
+              <option value="Roboto">Roboto (Clair & Lisible)</option>
+              <option value="Courier New">Courier New (Classique Rétro)</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="label">Police des lettres (Textes & Titres)</label>
+            <select 
+              className="input" 
+              value={state.fontLetters || 'Inter'}
+              onChange={e => updateSettings({ fontLetters: e.target.value })}
+              style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            >
+              <option value="Inter">Inter (Moderne & Neutre)</option>
+              <option value="Roboto">Roboto (Sleek Clean)</option>
+              <option value="Outfit">Outfit (Premium Géométrique)</option>
+              <option value="Montserrat">Montserrat (Élégant & Large)</option>
+              <option value="system-ui">System UI (Interface Système)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="flex items-center gap-3 mb-6">
           <User size={20} className="text-accent" />
@@ -153,11 +195,11 @@ export default function SettingsPage() {
           />
         </div>
         <div className="form-group" style={{ marginBottom: 16 }}>
-          <label className="label">Yahoo Finance API</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 8, color: 'var(--profit)', fontSize: 13 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--profit)', display: 'inline-block' }} />
-            Flux en direct Yahoo Finance Actif & Gratuit (aucune clé requise)
-          </div>
+          <label className="label">Twelve Data API Key</label>
+          <input className="input" type="password" placeholder="api_key_..."
+            value={state.apiKeys?.twelveData || ''} 
+            onChange={e => updateSettings({ apiKeys: { twelveData: e.target.value } })} 
+          />
         </div>
       </div>
 

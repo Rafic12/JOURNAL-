@@ -21,11 +21,20 @@ interface LocalPrefs {
   theme: string;
   symbolSettings: Record<string, { multiplier: number }>;
   apiKeys: Record<string, string>;
+  fontNumbers?: string;
+  fontLetters?: string;
 }
 
 function loadPrefs(userId: string): LocalPrefs {
   if (typeof window === 'undefined') {
-    return { activeAccountId: null, theme: 'green', symbolSettings: {}, apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' } };
+    return { 
+      activeAccountId: null, 
+      theme: 'green', 
+      symbolSettings: {}, 
+      apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' },
+      fontNumbers: 'Share Tech Mono',
+      fontLetters: 'Inter'
+    };
   }
   try {
     const raw = localStorage.getItem(PREFS_KEY_PREFIX + userId);
@@ -35,6 +44,8 @@ function loadPrefs(userId: string): LocalPrefs {
       if (!parsed.apiKeys.twelveData) {
         parsed.apiKeys.twelveData = '93775736c5474430ab18f4d1dcfea75b';
       }
+      if (!parsed.fontNumbers) parsed.fontNumbers = 'Share Tech Mono';
+      if (!parsed.fontLetters) parsed.fontLetters = 'Inter';
       return parsed;
     }
   } catch { /* ignore */ }
@@ -43,6 +54,8 @@ function loadPrefs(userId: string): LocalPrefs {
     theme: 'green',
     symbolSettings: { 'US30': { multiplier: 10 }, 'EURUSD': { multiplier: 100000 } },
     apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' },
+    fontNumbers: 'Share Tech Mono',
+    fontLetters: 'Inter'
   };
 }
 
@@ -77,7 +90,12 @@ interface StoreContextType {
   getFilteredTrades: () => Trade[];
   // Settings
   setTheme: (theme: string) => void;
-  updateSettings: (updates: { symbolSettings?: Record<string, { multiplier: number }>; apiKeys?: Record<string, string> }) => void;
+  updateSettings: (updates: { 
+    symbolSettings?: Record<string, { multiplier: number }>; 
+    apiKeys?: Record<string, string>; 
+    fontNumbers?: string; 
+    fontLetters?: string; 
+  }) => void;
   // Reset
   resetData: () => Promise<void>;
 }
@@ -93,6 +111,8 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
       theme: prefs.theme,
       symbolSettings: prefs.symbolSettings,
       apiKeys: prefs.apiKeys,
+      fontNumbers: prefs.fontNumbers,
+      fontLetters: prefs.fontLetters,
     };
   });
   const [loaded, setLoaded] = useState(false);
@@ -154,6 +174,8 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
           theme: prefs.theme,
           symbolSettings: prefs.symbolSettings,
           apiKeys: prefs.apiKeys,
+          fontNumbers: prefs.fontNumbers,
+          fontLetters: prefs.fontLetters,
         });
         setLoadError(null);
       } catch (e: any) {
@@ -176,8 +198,10 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
       theme: state.theme,
       symbolSettings: state.symbolSettings,
       apiKeys: state.apiKeys,
+      fontNumbers: state.fontNumbers,
+      fontLetters: state.fontLetters,
     });
-  }, [loaded, userId, state.activeAccountId, state.theme, state.symbolSettings, state.apiKeys]);
+  }, [loaded, userId, state.activeAccountId, state.theme, state.symbolSettings, state.apiKeys, state.fontNumbers, state.fontLetters]);
 
   useEffect(() => {
     if (state.theme && state.theme !== 'green') {
@@ -186,6 +210,30 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
       document.documentElement.removeAttribute('data-theme');
     }
   }, [state.theme]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const numFont = state.fontNumbers || 'Share Tech Mono';
+    const letFont = state.fontLetters || 'Inter';
+
+    // Set the CSS variables dynamically
+    document.documentElement.style.setProperty('--font-numbers', `'${numFont}', monospace`);
+    document.documentElement.style.setProperty('--font-letters', `'${letFont}', sans-serif`);
+
+    // Ensure we load the Google Fonts dynamically
+    const fontId = 'dynamic-google-fonts';
+    let link = document.getElementById(fontId) as HTMLLinkElement;
+    if (!link) {
+      link = document.createElement('link');
+      link.id = fontId;
+      link.rel = 'stylesheet';
+      document.head.appendChild(link);
+    }
+    
+    const encodedNum = encodeURIComponent(numFont);
+    const encodedLet = encodeURIComponent(letFont);
+    link.href = `https://fonts.googleapis.com/css2?family=${encodedNum}&family=${encodedLet}:wght@300;400;500;600;700;800&display=swap`;
+  }, [loaded, state.fontNumbers, state.fontLetters]);
 
   const addAccount = useCallback((account: Omit<Account, 'id' | 'createdAt'>) => {
     const newAcc = { ...account, id: uid(), createdAt: new Date().toISOString() };
@@ -279,11 +327,18 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
     setState(prev => ({ ...prev, theme }));
   }, []);
 
-  const updateSettings = useCallback((updates: { symbolSettings?: Record<string, { multiplier: number }>; apiKeys?: Record<string, string> }) => {
+  const updateSettings = useCallback((updates: { 
+    symbolSettings?: Record<string, { multiplier: number }>; 
+    apiKeys?: Record<string, string>; 
+    fontNumbers?: string; 
+    fontLetters?: string; 
+  }) => {
     setState(prev => ({
       ...prev,
       symbolSettings: updates.symbolSettings ? { ...prev.symbolSettings, ...updates.symbolSettings } : prev.symbolSettings,
       apiKeys: updates.apiKeys ? { ...prev.apiKeys, ...updates.apiKeys } : prev.apiKeys,
+      fontNumbers: updates.fontNumbers !== undefined ? updates.fontNumbers : prev.fontNumbers,
+      fontLetters: updates.fontLetters !== undefined ? updates.fontLetters : prev.fontLetters,
     }));
   }, []);
 
@@ -303,6 +358,8 @@ export function StoreProvider({ children, userId }: { children: React.ReactNode;
       theme: keptTheme,
       symbolSettings: { 'US30': { multiplier: 10 }, 'EURUSD': { multiplier: 100000 } },
       apiKeys: { twelveData: '93775736c5474430ab18f4d1dcfea75b' },
+      fontNumbers: 'Share Tech Mono',
+      fontLetters: 'Inter'
     });
   }, [userId, state.theme]);
 
