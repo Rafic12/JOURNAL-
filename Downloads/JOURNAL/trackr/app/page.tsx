@@ -106,7 +106,7 @@ export default function DashboardPage() {
       <div className="dashboard-welcome">
         <div className="dashboard-welcome-left">
           <h1 className="dashboard-welcome-title">
-            Bonjour{activeAccount ? `, ${activeAccount.name}` : ''} 👋
+            Bienvenue sur{activeAccount ? ` ${activeAccount.name}` : ' Journal+'} 👋
           </h1>
           <p className="dashboard-welcome-sub">
             {todayTrades.length > 0 
