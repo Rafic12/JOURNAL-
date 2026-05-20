@@ -3,7 +3,8 @@
 import { useState, useMemo, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { Trade } from '@/lib/types';
-import { Search, Trash2, ChevronUp, ChevronDown, SlidersHorizontal, Camera, X, Image as ImageIcon, Plus } from 'lucide-react';
+import { Search, Trash2, ChevronUp, ChevronDown, SlidersHorizontal, Camera, X, Image as ImageIcon, Plus, Loader2 } from 'lucide-react';
+import { dbSearchSymbols } from '@/lib/actions';
 
 function formatCurrency(val: number): string {
   return `${val >= 0 ? '+' : '-'}$${Math.abs(val).toFixed(2)}`;
@@ -40,6 +41,56 @@ export default function JournalPage() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingTradeId, setUploadingTradeId] = useState<string | null>(null);
+
+  // Asset Lookup Autocomplete states
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [lookupResults, setLookupResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showLookupDropdown, setShowLookupDropdown] = useState(false);
+
+  const cleanSymbol = (sym: string): string => {
+    const s = sym.toUpperCase().replace('/', '');
+    if (s === 'EURUSD=X') return 'EURUSD';
+    if (s === 'GBPUSD=X') return 'GBPUSD';
+    if (s === 'USDJPY=X') return 'USDJPY';
+    if (s === 'AUDUSD=X') return 'AUDUSD';
+    if (s === 'USDCAD=X') return 'USDCAD';
+    if (s === 'USDCHF=X') return 'USDCHF';
+    if (s === 'GC=F') return 'XAUUSD';
+    if (s === '^DJI') return 'US30';
+    if (s === '^IXIC') return 'NAS100';
+    if (s === '^GSPC') return 'SPX500';
+    if (s === 'BTC-USD') return 'BTCUSD';
+    if (s === 'ETH-USD') return 'ETHUSD';
+    if (s === 'SOL-USD') return 'SOLUSD';
+    return s;
+  };
+
+  const handleLookupChange = async (val: string, type: 'new' | 'edit') => {
+    setLookupQuery(val);
+    if (type === 'new') {
+      setNewTrade((prev: any) => ({ ...prev, symbol: val.toUpperCase() }));
+    } else {
+      setEditingTradeData((prev: any) => ({ ...prev, symbol: val.toUpperCase() }));
+    }
+
+    if (val.trim().length < 1) {
+      setLookupResults([]);
+      setShowLookupDropdown(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setShowLookupDropdown(true);
+    try {
+      const results = await dbSearchSymbols(val);
+      setLookupResults(results);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // Add Trade Modal State
   const [showAddTrade, setShowAddTrade] = useState(false);
@@ -628,13 +679,58 @@ export default function JournalPage() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="label">Symbole</label>
-                <input className="input" value={newTrade.symbol} onChange={e => {
-                  const sym = e.target.value.toUpperCase();
-                  const mult = state.symbolSettings?.[sym]?.multiplier || 100000;
-                  setNewTrade({ ...newTrade, symbol: sym, multiplier: mult });
-                }} placeholder="Ex: XAUUSD" />
+              <div className="form-group" style={{ position: 'relative' }}>
+                <label className="label">Symbole (Recherche Yahoo Finance)</label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    className="input" 
+                    value={newTrade.symbol} 
+                    onChange={e => handleLookupChange(e.target.value, 'new')} 
+                    placeholder="Ex: EURUSD, BTC-USD, AAPL, ^DJI..." 
+                    style={{ flex: 1, paddingRight: isSearching ? '32px' : '12px' }}
+                    onFocus={() => { if (newTrade.symbol) setShowLookupDropdown(true); }}
+                  />
+                  {isSearching && (
+                    <Loader2 size={16} className="animate-spin" style={{ position: 'absolute', right: 12, color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+
+                {showLookupDropdown && lookupResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1050,
+                    background: 'var(--card-bg)', border: '1px solid var(--border)',
+                    borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: 'auto',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.5)'
+                  }}>
+                    {lookupResults.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => {
+                          const cleaned = cleanSymbol(item.symbol);
+                          const mult = state.symbolSettings?.[cleaned]?.multiplier || (cleaned === 'US30' || cleaned === 'NAS100' ? 10 : cleaned === 'XAUUSD' ? 100 : 100000);
+                          setNewTrade((prev: any) => ({ ...prev, symbol: cleaned, multiplier: mult }));
+                          setShowLookupDropdown(false);
+                        }}
+                        style={{
+                          padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-primary)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{cleanSymbol(item.symbol)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                          <span className="badge badge-accent" style={{ fontSize: 10, padding: '2px 6px' }}>{item.type}</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{item.exchange}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="label">Direction</label>
@@ -838,13 +934,58 @@ export default function JournalPage() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="label">Symbole</label>
-                <input className="input" value={editingTradeData.symbol} onChange={e => {
-                  const sym = e.target.value.toUpperCase();
-                  const mult = state.symbolSettings?.[sym]?.multiplier || 100000;
-                  setEditingTradeData({ ...editingTradeData, symbol: sym, multiplier: mult });
-                }} />
+              <div className="form-group" style={{ position: 'relative' }}>
+                <label className="label">Symbole (Recherche Yahoo Finance)</label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input 
+                    className="input" 
+                    value={editingTradeData.symbol} 
+                    onChange={e => handleLookupChange(e.target.value, 'edit')} 
+                    placeholder="Ex: EURUSD, BTC-USD, AAPL, ^DJI..." 
+                    style={{ flex: 1, paddingRight: isSearching ? '32px' : '12px' }}
+                    onFocus={() => { if (editingTradeData.symbol) setShowLookupDropdown(true); }}
+                  />
+                  {isSearching && (
+                    <Loader2 size={16} className="animate-spin" style={{ position: 'absolute', right: 12, color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+
+                {showLookupDropdown && lookupResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1050,
+                    background: 'var(--card-bg)', border: '1px solid var(--border)',
+                    borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: 'auto',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.5)'
+                  }}>
+                    {lookupResults.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        onClick={() => {
+                          const cleaned = cleanSymbol(item.symbol);
+                          const mult = state.symbolSettings?.[cleaned]?.multiplier || (cleaned === 'US30' || cleaned === 'NAS100' ? 10 : cleaned === 'XAUUSD' ? 100 : 100000);
+                          setEditingTradeData((prev: any) => ({ ...prev, symbol: cleaned, multiplier: mult }));
+                          setShowLookupDropdown(false);
+                        }}
+                        style={{
+                          padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-primary)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{cleanSymbol(item.symbol)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                          <span className="badge badge-accent" style={{ fontSize: 10, padding: '2px 6px' }}>{item.type}</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{item.exchange}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="label">Direction</label>

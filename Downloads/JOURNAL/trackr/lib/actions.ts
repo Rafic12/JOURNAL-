@@ -238,3 +238,22 @@ export async function dbCheckConnection() {
     };
   }
 }
+
+export async function dbSearchSymbols(query: string) {
+  if (!query || query.trim().length < 1) return [];
+  try {
+    const res = await fetch(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&lang=fr-FR`);
+    const data = await res.json();
+    if (data && data.quotes) {
+      return data.quotes.map((q: any) => ({
+        symbol: q.symbol,
+        name: q.shortname || q.longname || q.symbol,
+        type: q.quoteType || q.typeDisp || 'Asset',
+        exchange: q.exchDisp || q.exchange || '',
+      }));
+    }
+  } catch (e) {
+    console.error('Yahoo Finance Search Error:', e);
+  }
+  return [];
+}

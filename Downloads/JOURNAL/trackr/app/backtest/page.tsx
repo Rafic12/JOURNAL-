@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { calculateKPIs, calculateEquityCurve } from '@/lib/calculations';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { GitCompare, TrendingUp, TrendingDown, Target, ShieldAlert } from 'lucide-react';
+import { GitCompare, TrendingUp, TrendingDown, Target, ShieldAlert, SlidersHorizontal } from 'lucide-react';
 
 function formatCurrency(val: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
@@ -102,7 +102,7 @@ export default function BacktestPage() {
             </ResponsiveContainer>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
             {/* Win Rate */}
             <div className="card">
               <div className="flex items-center gap-2 mb-4 text-muted">
@@ -185,6 +185,26 @@ export default function BacktestPage() {
               </div>
               <div className="pt-3 border-t border-[var(--border)]">
                 {getDiffBadge(kpis1.totalPnL, kpis2.totalPnL)}
+              </div>
+            </div>
+
+            {/* Sharpe Ratio */}
+            <div className="card">
+              <div className="flex items-center gap-2 mb-4 text-muted">
+                <SlidersHorizontal size={16} /> <span style={{ fontSize: 13, fontWeight: 600 }}>Sharpe Ratio</span>
+              </div>
+              <div className="flex justify-between items-end mb-2">
+                <div>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{acc1.name}</p>
+                  <p className="mono" style={{ fontSize: 18 }}>{kpis1.sharpeRatio.toFixed(2)}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{acc2.name}</p>
+                  <p className="mono" style={{ fontSize: 24, fontWeight: 700 }}>{kpis2.sharpeRatio.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="pt-3 border-t border-[var(--border)]">
+                {getDiffBadge(kpis1.sharpeRatio, kpis2.sharpeRatio)}
               </div>
             </div>
           </div>

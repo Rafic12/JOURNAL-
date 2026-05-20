@@ -153,11 +153,11 @@ export default function SettingsPage() {
           />
         </div>
         <div className="form-group" style={{ marginBottom: 16 }}>
-          <label className="label">Twelve Data API Key</label>
-          <input className="input" type="password" placeholder="93775..."
-            value={state.apiKeys?.twelveData || ''} 
-            onChange={e => updateSettings({ apiKeys: { twelveData: e.target.value } })} 
-          />
+          <label className="label">Yahoo Finance API</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 8, color: 'var(--profit)', fontSize: 13 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--profit)', display: 'inline-block' }} />
+            Flux en direct Yahoo Finance Actif & Gratuit (aucune clé requise)
+          </div>
         </div>
       </div>
 
